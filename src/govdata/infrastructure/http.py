@@ -28,10 +28,15 @@ class UrllibHttpClient:
         last_error: Exception | None = None
         for attempt in range(self._retries + 1):
             try:
-                return await asyncio.to_thread(
+                response = await asyncio.to_thread(
                     self._get_sync, url, request_headers, timeout
                 )
-            except (HTTPError, URLError, TimeoutError) as error:
+                if response.status not in {429, 500, 502, 503, 504}:
+                    return response
+                if attempt == self._retries:
+                    return response
+                await asyncio.sleep(self._retry_delay(response, attempt))
+            except (URLError, TimeoutError) as error:
                 last_error = error
                 if attempt < self._retries:
                     await asyncio.sleep(0.25 * (2**attempt))
@@ -40,15 +45,34 @@ class UrllibHttpClient:
     @staticmethod
     def _get_sync(url: str, headers: Mapping[str, str], timeout: float) -> HttpResponse:
         request = Request(url, headers=dict(headers), method="GET")
-        with urlopen(request, timeout=timeout) as response:  # noqa: S310
-            body = response.read()
-            content_encoding = response.headers.get("Content-Encoding", "").lower()
-            if content_encoding == "gzip":
-                body = gzip.decompress(body)
-            elif content_encoding == "deflate":
-                body = zlib.decompress(body)
-            return HttpResponse(
-                status=response.status,
-                headers=dict(response.headers.items()),
-                body=body,
+        try:
+            with urlopen(request, timeout=timeout) as response:  # noqa: S310
+                return UrllibHttpClient._build_response(
+                    response.status, response.headers, response.read()
+                )
+        except HTTPError as error:
+            return UrllibHttpClient._build_response(
+                error.code, error.headers, error.read()
             )
+
+    @staticmethod
+    def _build_response(status: int, headers: Mapping[str, str], body: bytes) -> HttpResponse:
+        content_encoding = headers.get("Content-Encoding", "").lower()
+        if content_encoding == "gzip":
+            body = gzip.decompress(body)
+        elif content_encoding == "deflate":
+            body = zlib.decompress(body)
+        return HttpResponse(status=status, headers=dict(headers.items()), body=body)
+
+    @staticmethod
+    def _retry_delay(response: HttpResponse, attempt: int) -> float:
+        retry_after = next(
+            (value for key, value in response.headers.items() if key.lower() == "retry-after"),
+            None,
+        )
+        if retry_after is not None:
+            try:
+                return min(max(float(retry_after), 0), 30)
+            except ValueError:
+                pass
+        return 0.25 * (2**attempt)

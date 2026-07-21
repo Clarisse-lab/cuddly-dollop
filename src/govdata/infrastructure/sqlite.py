@@ -4,9 +4,10 @@ import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 
-from govdata.core.models import StoredRecord
+from govdata.core.models import RecordPage, StoredRecord
 
 
 class SQLiteRecordRepository:
@@ -130,3 +131,44 @@ class SQLiteRecordRepository:
             }
             for row in rows
         ]
+
+    def query_records(
+        self,
+        connector_id: str,
+        dataset: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> RecordPage:
+        with self._connect() as connection:
+            total = connection.execute(
+                """SELECT COUNT(*) FROM records
+                WHERE connector_id = ? AND dataset = ?""",
+                (connector_id, dataset),
+            ).fetchone()[0]
+            rows = connection.execute(
+                """
+                SELECT external_id, data_json, collected_at, source_updated_at
+                FROM records WHERE connector_id = ? AND dataset = ?
+                ORDER BY external_id LIMIT ? OFFSET ?
+                """,
+                (connector_id, dataset, limit, offset),
+            ).fetchall()
+        return RecordPage(
+            records=tuple(
+                StoredRecord(
+                    connector_id=connector_id,
+                    dataset=dataset,
+                    external_id=row[0],
+                    data=json.loads(row[1]),
+                    collected_at=datetime.fromisoformat(row[2]),
+                    source_updated_at=(
+                        datetime.fromisoformat(row[3]) if row[3] is not None else None
+                    ),
+                )
+                for row in rows
+            ),
+            total=total,
+            limit=limit,
+            offset=offset,
+        )

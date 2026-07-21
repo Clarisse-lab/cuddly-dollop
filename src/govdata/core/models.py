@@ -68,3 +68,10 @@ class SyncResult:
     resumed_from: str | None
     completed: bool
 
+
+@dataclass(frozen=True, slots=True)
+class RecordPage:
+    records: tuple[StoredRecord, ...]
+    total: int
+    limit: int
+    offset: int

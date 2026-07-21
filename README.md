@@ -45,6 +45,37 @@ subcomando para alterá-lo.
 O formato `--params '{"chave":"valor"}'` continua disponível em shells que preservam
 as aspas JSON.
 
+## API para o dashboard
+
+Instale as dependências da API e dos testes:
+
+```powershell
+python -m pip install -e ".[api,test]"
+```
+
+Inicie o backend durante o desenvolvimento:
+
+```powershell
+govdata-api
+```
+
+A API ficará em `http://127.0.0.1:8000`, com documentação interativa em
+`http://127.0.0.1:8000/docs`. Endpoints iniciais:
+
+- `GET /health`
+- `GET /api/v1/connectors`
+- `GET /api/v1/records/{connector}/{dataset}?limit=50&offset=0`
+
+O frontend permitido pode ser configurado sem alterar código:
+
+```powershell
+$env:GOVDATA_CORS_ORIGINS="https://seu-dashboard.netlify.app"
+govdata-api
+```
+
+A API é somente de leitura. As sincronizações continuam no processo separado `govdata
+sync`, evitando manter requisições HTTP abertas durante coletas longas.
+
 ## Criando um conector externo
 
 Um pacote separado precisa apenas implementar o contrato estável:
@@ -80,6 +111,22 @@ minha-api = "meu_plugin:MeuConnector"
 
 Ao instalar esse pacote no mesmo ambiente, `govdata connectors` passa a encontrá-lo
 automaticamente. Nenhum arquivo do núcleo precisa ser modificado.
+
+## Plugin do Portal da Transparência
+
+O primeiro plugin externo está em `plugins/govdata-transparencia` e coleta órgãos do
+SIAFI com autenticação e paginação. Instale e use sem gravar a chave no repositório:
+
+```powershell
+python -m pip install -e .\plugins\govdata-transparencia
+$env:PORTAL_TRANSPARENCIA_API_KEY="sua-chave"
+govdata connectors
+govdata sync transparencia orgaos-siafi
+govdata records transparencia orgaos-siafi
+```
+
+Consulte o README do plugin para detalhes. A chave nunca deve ser enviada como argumento
+de linha de comando ou incluída em arquivos versionados.
 
 ## Desenvolvimento
 

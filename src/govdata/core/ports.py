@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
 
-from govdata.core.models import ConnectorPage, ConnectorSpec, StoredRecord
+from govdata.core.models import ConnectorPage, ConnectorSpec, RecordPage, StoredRecord
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,3 +68,14 @@ class RecordRepository(Protocol):
     ) -> int: ...
 
     def clear_checkpoint(self, connector_id: str, dataset: str, scope: str) -> None: ...
+
+
+class RecordQueryRepository(Protocol):
+    def query_records(
+        self,
+        connector_id: str,
+        dataset: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> RecordPage: ...

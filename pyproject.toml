@@ -12,8 +12,16 @@ license = { text = "MIT" }
 authors = [{ name = "Dados Gov Plataforma" }]
 dependencies = []
 
+[project.optional-dependencies]
+api = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
+]
+test = ["httpx2>=2,<3"]
+
 [project.scripts]
 govdata = "govdata.cli:main"
+govdata-api = "govdata.api.app:run"
 
 [project.entry-points."govdata.connectors"]
 ibge = "govdata.connectors.ibge:IBGEConnector"
@@ -31,4 +39,3 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
-
