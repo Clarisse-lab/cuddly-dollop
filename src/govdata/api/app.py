@@ -14,15 +14,14 @@ from govdata.api.schemas import (
     RecordPageResponse,
     RecordResponse,
 )
-from govdata.bootstrap import create_registry
+from govdata.bootstrap import create_registry, create_repository
 from govdata.core.ports import RecordQueryRepository
 from govdata.core.registry import ConnectorRegistry
-from govdata.infrastructure.sqlite import SQLiteRecordRepository
 
 
 @dataclass(frozen=True, slots=True)
 class ApiSettings:
-    database: Path
+    database: str | Path | None
     cors_origins: tuple[str, ...]
 
     @classmethod
@@ -32,7 +31,7 @@ class ApiSettings:
             "http://localhost:3000,http://localhost:5173",
         )
         return cls(
-            database=Path(os.getenv("GOVDATA_DATABASE", "govdata.sqlite3")),
+            database=os.getenv("DATABASE_URL") or os.getenv("GOVDATA_DATABASE"),
             cors_origins=tuple(
                 origin.strip() for origin in raw_origins.split(",") if origin.strip()
             ),
@@ -47,7 +46,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or ApiSettings.from_environment()
     registry = registry or create_registry()
-    repository = repository or SQLiteRecordRepository(settings.database)
+    repository = repository or create_repository(settings.database)
 
     application = FastAPI(
         title="Dados Gov API",

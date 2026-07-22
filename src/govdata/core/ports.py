@@ -71,6 +71,10 @@ class RecordRepository(Protocol):
 
 
 class RecordQueryRepository(Protocol):
+    def list_records(
+        self, connector_id: str, dataset: str, limit: int = 100
+    ) -> list[dict[str, object]]: ...
+
     def query_records(
         self,
         connector_id: str,
@@ -79,3 +83,7 @@ class RecordQueryRepository(Protocol):
         limit: int,
         offset: int,
     ) -> RecordPage: ...
+
+
+class DataRepository(RecordRepository, RecordQueryRepository, Protocol):
+    """Complete persistence contract used by API, CLI and synchronization."""

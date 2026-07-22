@@ -21,3 +21,10 @@ class TransportError(GovDataError):
 class InvalidResponseError(GovDataError):
     pass
 
+
+class DatabaseConfigurationError(GovDataError):
+    pass
+
+
+class PersistenceError(GovDataError):
+    pass

@@ -76,6 +76,79 @@ govdata-api
 A API é somente de leitura. As sincronizações continuam no processo separado `govdata
 sync`, evitando manter requisições HTTP abertas durante coletas longas.
 
+## PostgreSQL e migrations
+
+SQLite continua sendo o padrão para desenvolvimento. Para produção, instale o adaptador
+PostgreSQL junto com a API:
+
+```powershell
+python -m pip install -e ".[api,postgres]"
+```
+
+Configure a URL fornecida pela hospedagem e execute normalmente:
+
+```powershell
+$env:DATABASE_URL="postgresql://usuario:senha@servidor:5432/govdata"
+govdata sync transparencia orgaos-siafi
+govdata-api
+```
+
+`DATABASE_URL` seleciona automaticamente PostgreSQL para a CLI, o worker e a API. Sem
+ela, a plataforma usa `govdata.sqlite3`. URLs `sqlite:///caminho.sqlite3` também são
+aceitas.
+
+As migrations SQL versionadas ficam em `src/govdata/infrastructure/migrations` e são
+aplicadas automaticamente, uma única vez, ao iniciar o repositório. No PostgreSQL, uma
+trava transacional evita concorrência entre instâncias durante a atualização do schema.
+
+Não coloque `DATABASE_URL` no Git: ela normalmente contém a senha do banco e deve ser
+configurada como secret na hospedagem do backend.
+
+## Deploy do backend no Railway
+
+O `Dockerfile` instala a API, o adaptador PostgreSQL e o plugin do Portal da
+Transparência. O `railway.toml` configura o health check em `/health`; a porta pública
+é fornecida pelo Railway e lida automaticamente pela aplicação.
+
+1. No Railway, crie um projeto a partir deste repositório do GitHub.
+2. Adicione um serviço PostgreSQL ao mesmo projeto.
+3. No serviço da API, crie estas variáveis:
+
+```text
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+PORTAL_TRANSPARENCIA_API_KEY=sua-chave-do-portal
+GOVDATA_CORS_ORIGINS=https://seu-dashboard.netlify.app
+```
+
+O nome `Postgres` na referência deve ser igual ao nome do serviço de banco no projeto.
+Se o Netlify também usar um domínio próprio, separe as origens permitidas por vírgula:
+
+```text
+GOVDATA_CORS_ORIGINS=https://seu-dashboard.netlify.app,https://dashboard.seudominio.com.br
+```
+
+Em **Settings > Networking**, gere um domínio público para a API. Depois do deploy,
+confirme os endereços `https://seu-backend.up.railway.app/health` e
+`https://seu-backend.up.railway.app/docs`.
+
+No Netlify, configure apenas a URL pública do backend, por exemplo
+`VITE_API_URL=https://seu-backend.up.railway.app`. A chave do Portal e a URL do banco
+pertencem somente ao Railway e nunca devem ser expostas ao frontend.
+
+### Sincronização em produção
+
+A API é um serviço permanente e apenas lê os registros. Para atualizar os dados,
+execute no serviço da API pelo shell do Railway:
+
+```bash
+govdata sync transparencia orgaos-siafi
+```
+
+Depois da primeira carga, pode ser criado um segundo serviço a partir da mesma imagem,
+compartilhando `DATABASE_URL` e `PORTAL_TRANSPARENCIA_API_KEY`, com o comando acima e
+um Cron Schedule. Esse processo termina ao concluir a coleta, como exigido pelos Cron
+Jobs do Railway.
+
 ## Criando um conector externo
 
 Um pacote separado precisa apenas implementar o contrato estável:

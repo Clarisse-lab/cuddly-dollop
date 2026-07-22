@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from govdata.core.models import RecordPage, StoredRecord
+from govdata.infrastructure.migrations import load_migrations
 
 
 class SQLiteRecordRepository:
@@ -27,27 +28,28 @@ class SQLiteRecordRepository:
 
     def _initialize(self) -> None:
         with self._connect() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS records (
-                    connector_id TEXT NOT NULL,
-                    dataset TEXT NOT NULL,
-                    external_id TEXT NOT NULL,
-                    data_json TEXT NOT NULL,
-                    collected_at TEXT NOT NULL,
-                    source_updated_at TEXT,
-                    PRIMARY KEY (connector_id, dataset, external_id)
-                );
-                CREATE TABLE IF NOT EXISTS checkpoints (
-                    connector_id TEXT NOT NULL,
-                    dataset TEXT NOT NULL,
-                    scope TEXT NOT NULL,
-                    cursor TEXT,
-                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (connector_id, dataset, scope)
-                );
-                """
+            connection.execute(
+                """CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version TEXT PRIMARY KEY,
+                    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )"""
             )
+            applied = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT version FROM schema_migrations"
+                ).fetchall()
+            }
+            for version, script in load_migrations(
+                "govdata.infrastructure.migrations.sqlite"
+            ):
+                if version in applied:
+                    continue
+                connection.executescript(script)
+                connection.execute(
+                    "INSERT INTO schema_migrations (version) VALUES (?)",
+                    (version,),
+                )
 
     def get_checkpoint(self, connector_id: str, dataset: str, scope: str) -> str | None:
         with self._connect() as connection:

@@ -3,13 +3,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from typing import Any
 
-from govdata.bootstrap import create_registry, create_sync_service
+from govdata.bootstrap import create_registry, create_repository, create_sync_service
 from govdata.core.errors import GovDataError
 from govdata.core.models import SyncRequest
-from govdata.infrastructure.sqlite import SQLiteRecordRepository
 
 
 def _json_object(raw: str) -> dict[str, Any]:
@@ -39,7 +39,11 @@ def _merge_values(base: dict[str, Any], pairs: list[tuple[str, Any]]) -> dict[st
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="govdata")
-    parser.add_argument("--database", default="govdata.sqlite3", help="SQLite database path")
+    parser.add_argument(
+        "--database",
+        default=os.getenv("DATABASE_URL") or os.getenv("GOVDATA_DATABASE"),
+        help="database path or URL; defaults to DATABASE_URL or local SQLite",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("connectors", help="list installed connectors")
@@ -107,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
                 "completed": result.completed,
             }
         else:
-            output = SQLiteRecordRepository(args.database).list_records(
+            output = create_repository(args.database).list_records(
                 args.connector, args.dataset, args.limit
             )
         print(json.dumps(output, ensure_ascii=False, indent=2))
