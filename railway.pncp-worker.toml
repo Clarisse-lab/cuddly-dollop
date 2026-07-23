@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "govdata sync pncp open-opportunities"
+cronSchedule = "0 */6 * * *"
+restartPolicyType = "NEVER"

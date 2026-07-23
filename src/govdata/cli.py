@@ -87,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
                     "name": spec.display_name,
                     "version": spec.version,
                     "datasets": spec.datasets,
+                    "source_url": spec.source_url,
                 }
                 for spec in create_registry().specs()
             ]

@@ -88,9 +88,46 @@ class SQLiteMigrationTests(unittest.TestCase):
                 count = connection.execute("SELECT COUNT(*) FROM records").fetchone()[0]
             self.assertEqual(
                 [row[0] for row in versions],
-                ["001_records.sql", "002_checkpoints.sql"],
+                ["001_records.sql", "002_checkpoints.sql", "003_record_history.sql"],
             )
             self.assertEqual(count, 1)
+
+    def test_preserves_only_distinct_record_versions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "history.sqlite3"
+            repository = SQLiteRecordRepository(path)
+            collected_at = datetime(2026, 7, 22, tzinfo=UTC)
+
+            for name in ("first", "first", "changed"):
+                repository.commit_page(
+                    "source",
+                    "items",
+                    "scope",
+                    (
+                        StoredRecord(
+                            connector_id="source",
+                            dataset="items",
+                            external_id="1",
+                            data={"name": name},
+                            source_url="https://example.gov/item/1",
+                            collected_at=collected_at,
+                        ),
+                    ),
+                    None,
+                )
+
+            with closing(sqlite3.connect(path)) as connection:
+                version_count = connection.execute(
+                    "SELECT COUNT(*) FROM record_versions"
+                ).fetchone()[0]
+                current = connection.execute(
+                    "SELECT data_json, source_url, content_hash FROM records"
+                ).fetchone()
+
+            self.assertEqual(version_count, 2)
+            self.assertEqual(current[1], "https://example.gov/item/1")
+            self.assertTrue(current[2])
+            self.assertEqual(current[0], '{"name": "changed"}')
 
     def test_packages_migrations_for_both_engines(self) -> None:
         sqlite_versions = load_migrations("govdata.infrastructure.migrations.sqlite")

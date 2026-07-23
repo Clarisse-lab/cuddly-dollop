@@ -37,6 +37,7 @@ class PortalTransparenciaConnector(PublicDataConnector):
         id="transparencia",
         display_name="Portal da Transparência",
         datasets=tuple(DATASETS),
+        source_url="https://portaldatransparencia.gov.br",
     )
 
     def validate_config(self) -> None:
@@ -102,6 +103,7 @@ class PortalTransparenciaConnector(PublicDataConnector):
                 ConnectorRecord(
                     external_id=str(item[definition.id_field]),
                     data=item,
+                    source_url=url,
                 )
             )
         return ConnectorPage(

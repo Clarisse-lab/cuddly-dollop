@@ -16,6 +16,7 @@ class ConnectorResponse(BaseModel):
     name: str
     version: str
     datasets: list[str]
+    source_url: str | None
 
 
 class RecordResponse(BaseModel):
@@ -25,6 +26,8 @@ class RecordResponse(BaseModel):
     data: dict[str, Any]
     collected_at: datetime
     source_updated_at: datetime | None
+    source_url: str | None
+    content_hash: str
 
 
 class RecordPageResponse(BaseModel):

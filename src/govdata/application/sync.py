@@ -52,6 +52,7 @@ class SyncService:
                     data=item.data,
                     collected_at=collected_at,
                     source_updated_at=item.source_updated_at,
+                    source_url=item.source_url,
                 )
                 for item in page.records
             )

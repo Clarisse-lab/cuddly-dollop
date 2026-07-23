@@ -11,9 +11,11 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 COPY plugins/govdata-transparencia ./plugins/govdata-transparencia
+COPY plugins/govdata-pncp ./plugins/govdata-pncp
 
 RUN python -m pip install ".[api,postgres]" \
-    && python -m pip install ./plugins/govdata-transparencia
+    && python -m pip install ./plugins/govdata-transparencia \
+    && python -m pip install ./plugins/govdata-pncp
 
 EXPOSE 8000
 

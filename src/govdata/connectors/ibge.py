@@ -13,6 +13,7 @@ class IBGEConnector(PublicDataConnector):
         id="ibge",
         display_name="IBGE Localidades",
         datasets=("states", "municipalities"),
+        source_url="https://servicodados.ibge.gov.br",
     )
 
     def validate_config(self) -> None:
@@ -71,5 +72,11 @@ class IBGEConnector(PublicDataConnector):
         for item in payload:
             if not isinstance(item, dict) or "id" not in item:
                 raise InvalidResponseError("IBGE item is missing an id")
-            records.append(ConnectorRecord(external_id=str(item["id"]), data=item))
+            records.append(
+                ConnectorRecord(
+                    external_id=str(item["id"]),
+                    data=item,
+                    source_url=f"{base_url}{path}",
+                )
+            )
         return ConnectorPage(records=tuple(records))

@@ -65,6 +65,10 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()[0]["id"], "ibge")
+        self.assertEqual(
+            response.json()[0]["source_url"],
+            "https://servicodados.ibge.gov.br",
+        )
 
     def test_returns_paginated_records(self) -> None:
         response = self.client.get("/api/v1/records/ibge/states?limit=1&offset=1")
@@ -75,6 +79,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(body["limit"], 1)
         self.assertEqual(body["offset"], 1)
         self.assertEqual(body["items"][0]["external_id"], "35")
+        self.assertTrue(body["items"][0]["content_hash"])
 
     def test_rejects_unknown_connector(self) -> None:
         response = self.client.get("/api/v1/records/missing/states")

@@ -79,27 +79,63 @@ class PostgresRecordRepository:
     ) -> int:
         with self._connect() as connection:
             with connection.cursor() as cursor:
+                serialized_records = [
+                    (
+                        item.connector_id,
+                        item.dataset,
+                        item.external_id,
+                        self._jsonb(dict(item.data)),
+                        item.content_hash,
+                        item.source_url,
+                        item.collected_at,
+                        item.source_updated_at,
+                    )
+                    for item in records
+                ]
+                cursor.executemany(
+                    """
+                    INSERT INTO record_versions (
+                        connector_id, dataset, external_id, data_json, content_hash,
+                        source_url, collected_at, source_updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(connector_id, dataset, external_id, content_hash) DO NOTHING
+                    """,
+                    serialized_records,
+                )
                 cursor.executemany(
                     """
                     INSERT INTO records (
                         connector_id, dataset, external_id, data_json,
-                        collected_at, source_updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                        collected_at, source_updated_at, source_url, content_hash
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT(connector_id, dataset, external_id) DO UPDATE SET
                         data_json = excluded.data_json,
                         collected_at = excluded.collected_at,
-                        source_updated_at = excluded.source_updated_at
+                        source_updated_at = excluded.source_updated_at,
+                        source_url = excluded.source_url,
+                        content_hash = excluded.content_hash
                     """,
                     [
                         (
-                            item.connector_id,
-                            item.dataset,
-                            item.external_id,
-                            self._jsonb(dict(item.data)),
-                            item.collected_at,
-                            item.source_updated_at,
+                            connector_id,
+                            dataset,
+                            external_id,
+                            data_json,
+                            collected_at,
+                            source_updated_at,
+                            source_url,
+                            item_hash,
                         )
-                        for item in records
+                        for (
+                            connector_id,
+                            dataset,
+                            external_id,
+                            data_json,
+                            item_hash,
+                            source_url,
+                            collected_at,
+                            source_updated_at,
+                        ) in serialized_records
                     ],
                 )
                 cursor.execute(
@@ -128,7 +164,8 @@ class PostgresRecordRepository:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT external_id, data_json, collected_at, source_updated_at
+                SELECT external_id, data_json, collected_at, source_updated_at,
+                       source_url, content_hash
                 FROM records WHERE connector_id = %s AND dataset = %s
                 ORDER BY external_id LIMIT %s
                 """,
@@ -140,6 +177,8 @@ class PostgresRecordRepository:
                 "data": row[1],
                 "collected_at": row[2].isoformat(),
                 "source_updated_at": row[3].isoformat() if row[3] else None,
+                "source_url": row[4],
+                "content_hash": row[5],
             }
             for row in rows
         ]
@@ -160,7 +199,8 @@ class PostgresRecordRepository:
             ).fetchone()[0]
             rows = connection.execute(
                 """
-                SELECT external_id, data_json, collected_at, source_updated_at
+                SELECT external_id, data_json, collected_at, source_updated_at,
+                       source_url, content_hash
                 FROM records WHERE connector_id = %s AND dataset = %s
                 ORDER BY external_id LIMIT %s OFFSET %s
                 """,
@@ -175,6 +215,8 @@ class PostgresRecordRepository:
                     data=row[1],
                     collected_at=self._datetime(row[2]),
                     source_updated_at=self._datetime(row[3]) if row[3] else None,
+                    source_url=row[4],
+                    content_hash=row[5] or "",
                 )
                 for row in rows
             ),

@@ -69,27 +69,63 @@ class SQLiteRecordRepository:
         next_cursor: str | None,
     ) -> int:
         with self._connect() as connection:
+            serialized_records = [
+                (
+                    item.connector_id,
+                    item.dataset,
+                    item.external_id,
+                    json.dumps(dict(item.data), ensure_ascii=False, sort_keys=True),
+                    item.content_hash,
+                    item.source_url,
+                    item.collected_at.isoformat(),
+                    item.source_updated_at.isoformat() if item.source_updated_at else None,
+                )
+                for item in records
+            ]
+            connection.executemany(
+                """
+                INSERT INTO record_versions (
+                    connector_id, dataset, external_id, data_json, content_hash,
+                    source_url, collected_at, source_updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(connector_id, dataset, external_id, content_hash) DO NOTHING
+                """,
+                serialized_records,
+            )
             connection.executemany(
                 """
                 INSERT INTO records (
                     connector_id, dataset, external_id, data_json,
-                    collected_at, source_updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    collected_at, source_updated_at, source_url, content_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(connector_id, dataset, external_id) DO UPDATE SET
                     data_json = excluded.data_json,
                     collected_at = excluded.collected_at,
-                    source_updated_at = excluded.source_updated_at
+                    source_updated_at = excluded.source_updated_at,
+                    source_url = excluded.source_url,
+                    content_hash = excluded.content_hash
                 """,
                 [
                     (
-                        item.connector_id,
-                        item.dataset,
-                        item.external_id,
-                        json.dumps(dict(item.data), ensure_ascii=False, sort_keys=True),
-                        item.collected_at.isoformat(),
-                        item.source_updated_at.isoformat() if item.source_updated_at else None,
+                        connector_id,
+                        dataset,
+                        external_id,
+                        data_json,
+                        collected_at,
+                        source_updated_at,
+                        source_url,
+                        item_hash,
                     )
-                    for item in records
+                    for (
+                        connector_id,
+                        dataset,
+                        external_id,
+                        data_json,
+                        item_hash,
+                        source_url,
+                        collected_at,
+                        source_updated_at,
+                    ) in serialized_records
                 ],
             )
             connection.execute(
@@ -118,7 +154,8 @@ class SQLiteRecordRepository:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT external_id, data_json, collected_at, source_updated_at
+                SELECT external_id, data_json, collected_at, source_updated_at,
+                       source_url, content_hash
                 FROM records WHERE connector_id = ? AND dataset = ?
                 ORDER BY external_id LIMIT ?
                 """,
@@ -130,6 +167,8 @@ class SQLiteRecordRepository:
                 "data": json.loads(row[1]),
                 "collected_at": row[2],
                 "source_updated_at": row[3],
+                "source_url": row[4],
+                "content_hash": row[5],
             }
             for row in rows
         ]
@@ -150,7 +189,8 @@ class SQLiteRecordRepository:
             ).fetchone()[0]
             rows = connection.execute(
                 """
-                SELECT external_id, data_json, collected_at, source_updated_at
+                SELECT external_id, data_json, collected_at, source_updated_at,
+                       source_url, content_hash
                 FROM records WHERE connector_id = ? AND dataset = ?
                 ORDER BY external_id LIMIT ? OFFSET ?
                 """,
@@ -167,6 +207,8 @@ class SQLiteRecordRepository:
                     source_updated_at=(
                         datetime.fromisoformat(row[3]) if row[3] is not None else None
                     ),
+                    source_url=row[4],
+                    content_hash=row[5] or "",
                 )
                 for row in rows
             ),

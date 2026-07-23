@@ -23,6 +23,8 @@ Propriedades da base:
 - descoberta de plugins via entry points `govdata.connectors`;
 - paginação orientada por cursor e checkpoint transacional por página e parâmetros;
 - reprocessamento idempotente por `(connector_id, dataset, external_id)`;
+- proveniência por registro com URL da fonte e hash verificável do conteúdo;
+- histórico imutável de versões distintas, sem duplicar coletas sem alteração;
 - transporte HTTP, persistência e conectores injetáveis e testáveis offline;
 - zero dependências de runtime no núcleo inicial.
 
@@ -166,6 +168,17 @@ O worker executa `govdata sync transparencia orgaos-siafi` diariamente às 09:00
 equivalente a 06:00 no horário de Brasília. O agendamento pode ser alterado em
 `cronSchedule`; cron jobs do Railway sempre usam UTC.
 
+Para oportunidades abertas do PNCP, crie outro serviço sem domínio público e use
+`/railway.pncp-worker.toml` em **Settings > Config-as-code**. Esse worker precisa apenas
+da referência ao banco:
+
+```text
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+```
+
+Ele executa `govdata sync pncp open-opportunities` a cada seis horas. A API pública do
+PNCP não exige chave.
+
 ## Criando um conector externo
 
 Um pacote separado precisa apenas implementar o contrato estável:
@@ -217,6 +230,30 @@ govdata records transparencia orgaos-siafi
 
 Consulte o README do plugin para detalhes. A chave nunca deve ser enviada como argumento
 de linha de comando ou incluída em arquivos versionados.
+
+## Plugin do PNCP
+
+O plugin em `plugins/govdata-pncp` consulta oportunidades com recebimento de propostas
+aberto no Portal Nacional de Contratações Públicas:
+
+```powershell
+python -m pip install -e .\plugins\govdata-pncp
+govdata sync pncp open-opportunities
+govdata records pncp open-opportunities --limit 10
+```
+
+Filtros oficiais do PNCP, como UF, município, CNPJ e modalidade, podem ser enviados
+com `--param`. Cada oportunidade guarda o identificador oficial, a URL de consulta,
+a data de atualização da fonte e o histórico das mudanças do conteúdo.
+
+## Proveniência e histórico
+
+`records` mantém a versão atual de cada registro para consultas rápidas. A tabela
+`record_versions` preserva uma cópia somente quando o hash do conteúdo muda. Isso
+permite reconstruir mudanças ao longo do tempo sem multiplicar versões idênticas.
+
+A API retorna `source_url` e `content_hash` junto de cada registro. Esses campos serão
+usados pelas futuras análises e respostas de IA para apresentar a evidência original.
 
 ## Desenvolvimento
 

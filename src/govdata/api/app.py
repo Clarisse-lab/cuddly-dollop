@@ -77,6 +77,7 @@ def create_app(
                 name=spec.display_name,
                 version=spec.version,
                 datasets=list(spec.datasets),
+                source_url=spec.source_url,
             )
             for spec in registry.specs()
         ]
@@ -112,6 +113,8 @@ def create_app(
                     data=dict(record.data),
                     collected_at=record.collected_at,
                     source_updated_at=record.source_updated_at,
+                    source_url=record.source_url,
+                    content_hash=record.content_hash,
                 )
                 for record in page.records
             ],
