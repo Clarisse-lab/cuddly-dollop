@@ -149,6 +149,23 @@ compartilhando `DATABASE_URL` e `PORTAL_TRANSPARENCIA_API_KEY`, com o comando ac
 um Cron Schedule. Esse processo termina ao concluir a coleta, como exigido pelos Cron
 Jobs do Railway.
 
+O arquivo `railway.worker.toml` já contém a configuração desse serviço. Para ativá-lo:
+
+1. adicione outro serviço ao projeto apontando para o mesmo repositório GitHub;
+2. nomeie o serviço como `transparencia-sync`;
+3. em **Settings > Config-as-code**, selecione `/railway.worker.toml`;
+4. adicione ao worker as variáveis abaixo;
+5. não gere domínio público para o worker.
+
+```text
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+PORTAL_TRANSPARENCIA_API_KEY=sua-chave-do-portal
+```
+
+O worker executa `govdata sync transparencia orgaos-siafi` diariamente às 09:00 UTC,
+equivalente a 06:00 no horário de Brasília. O agendamento pode ser alterado em
+`cronSchedule`; cron jobs do Railway sempre usam UTC.
+
 ## Criando um conector externo
 
 Um pacote separado precisa apenas implementar o contrato estável:

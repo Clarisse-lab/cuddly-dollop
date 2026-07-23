@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "govdata sync transparencia orgaos-siafi"
+cronSchedule = "0 9 * * *"
+restartPolicyType = "NEVER"
