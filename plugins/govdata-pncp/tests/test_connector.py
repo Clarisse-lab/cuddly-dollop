@@ -174,6 +174,42 @@ class PNCPConnectorTests(unittest.TestCase):
                 )
             )
 
+    def test_waits_and_recovers_from_server_error(self) -> None:
+        server_error = HttpResponse(status=500, headers={}, body=b"{}")
+        success = HttpResponse(
+            status=200,
+            headers={},
+            body=json.dumps(
+                {"data": [], "totalPaginas": 1, "numeroPagina": 1}
+            ).encode(),
+        )
+        http = SequenceHttpClient([server_error, success])
+
+        with (
+            patch(
+                "govdata_pncp.connector.monotonic",
+                side_effect=[0.0, 20.0, 20.0],
+            ),
+            patch(
+                "govdata_pncp.connector.asyncio.sleep",
+                new=AsyncMock(),
+            ) as sleep,
+            self.assertLogs("govdata_pncp.connector", level="WARNING") as logs,
+        ):
+            page = asyncio.run(
+                PNCPConnector().fetch_page(
+                    "open-opportunities",
+                    {"dataFinal": "20260723"},
+                    None,
+                    http,
+                )
+            )
+
+        self.assertEqual(page.records, ())
+        self.assertEqual(len(http.urls), 2)
+        sleep.assert_awaited_once_with(15)
+        self.assertIn("HTTP 500", logs.output[0])
+
     def test_validates_request_rate(self) -> None:
         with self.assertRaises(ConnectorConfigurationError):
             PNCPConnector({"requests_per_minute": 0})

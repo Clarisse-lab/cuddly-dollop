@@ -20,6 +20,6 @@ govdata sync pncp open-opportunities --param uf=SP
 O endpoint público de consulta do PNCP não exige chave.
 
 Por padrão, o conector limita a coleta a 12 requisições por minuto e aplica espera
-exponencial quando a API responde com HTTP 429. A cadência pode ser alterada com a
-configuração `requests_per_minute`, mas valores maiores podem provocar bloqueio
-temporário pelo PNCP.
+exponencial quando a API responde com HTTP 429 ou com falhas temporárias 5xx. A
+cadência pode ser alterada com a configuração `requests_per_minute`, mas valores
+maiores podem provocar bloqueio temporário pelo PNCP.

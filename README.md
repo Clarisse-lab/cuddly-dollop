@@ -178,7 +178,8 @@ DATABASE_URL=${{Postgres.DATABASE_URL}}
 
 Ele executa `govdata sync pncp open-opportunities` a cada seis horas. A API pública do
 PNCP não exige chave. O conector limita a paginação a 12 requisições por minuto e
-aguarda automaticamente quando o serviço responde com HTTP 429.
+aguarda automaticamente quando o serviço responde com HTTP 429 ou falhas temporárias
+HTTP 500, 502, 503 e 504.
 
 ## Criando um conector externo
 

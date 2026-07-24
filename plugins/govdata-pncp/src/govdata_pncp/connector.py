@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import UTC, datetime
 from time import monotonic
 from typing import Any, Mapping
@@ -13,6 +14,10 @@ from govdata.core.errors import (
 )
 from govdata.core.models import ConnectorPage, ConnectorRecord, ConnectorSpec
 from govdata.core.ports import HttpClient, HttpResponse, PublicDataConnector
+
+
+LOGGER = logging.getLogger(__name__)
+TRANSIENT_STATUSES = {429, 500, 502, 503, 504}
 
 
 class PNCPConnector(PublicDataConnector):
@@ -94,7 +99,7 @@ class PNCPConnector(PublicDataConnector):
         query["tamanhoPagina"] = self._page_size
         url = f"{self._base_url}/v1/contratacoes/proposta?{urlencode(query, doseq=True)}"
 
-        response = await self._get_with_rate_limit(http, url)
+        response = await self._get_with_retries(http, url)
         self._raise_for_status(response)
         payload = self._json_object(response)
         items = payload.get("data")
@@ -135,16 +140,25 @@ class PNCPConnector(PublicDataConnector):
         )
         return ConnectorPage(records=tuple(records), next_cursor=next_cursor)
 
-    async def _get_with_rate_limit(
-        self, http: HttpClient, url: str
-    ) -> HttpResponse:
+    async def _get_with_retries(self, http: HttpClient, url: str) -> HttpResponse:
         for attempt in range(self._rate_limit_retries + 1):
             await self._respect_rate_limit()
             response = await http.get(url, timeout=self._timeout)
             self._last_request_at = monotonic()
-            if response.status != 429 or attempt == self._rate_limit_retries:
+            if (
+                response.status not in TRANSIENT_STATUSES
+                or attempt == self._rate_limit_retries
+            ):
                 return response
-            await asyncio.sleep(self._retry_delay(response, attempt))
+            delay = self._retry_delay(response, attempt)
+            LOGGER.warning(
+                "PNCP returned HTTP %s; retrying in %.0f seconds (%s/%s)",
+                response.status,
+                delay,
+                attempt + 1,
+                self._rate_limit_retries,
+            )
+            await asyncio.sleep(delay)
         raise AssertionError("unreachable")
 
     async def _respect_rate_limit(self) -> None:
