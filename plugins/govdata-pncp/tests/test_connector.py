@@ -4,8 +4,13 @@ import asyncio
 import json
 import unittest
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, patch
 
-from govdata.core.errors import ConnectorConfigurationError, InvalidResponseError
+from govdata.core.errors import (
+    ConnectorConfigurationError,
+    InvalidResponseError,
+    TransportError,
+)
 from govdata.core.ports import HttpResponse
 from govdata_pncp.connector import PNCPConnector
 
@@ -24,6 +29,18 @@ class FakeHttpClient:
         self.urls.append(url)
         self.timeouts.append(timeout)
         return self.response
+
+
+class SequenceHttpClient(FakeHttpClient):
+    def __init__(self, responses: list[HttpResponse]) -> None:
+        self.responses = responses
+        self.urls = []
+        self.timeouts = []
+
+    async def get(self, url, *, headers=None, timeout=30):  # type: ignore[no-untyped-def]
+        self.urls.append(url)
+        self.timeouts.append(timeout)
+        return self.responses.pop(0)
 
 
 class PNCPConnectorTests(unittest.TestCase):
@@ -105,6 +122,61 @@ class PNCPConnectorTests(unittest.TestCase):
     def test_validates_page_size(self) -> None:
         with self.assertRaises(ConnectorConfigurationError):
             PNCPConnector({"page_size": 2})
+
+    def test_waits_and_retries_rate_limit(self) -> None:
+        limited = HttpResponse(
+            status=429,
+            headers={"Retry-After": "7"},
+            body=b"{}",
+        )
+        success = HttpResponse(
+            status=200,
+            headers={},
+            body=json.dumps(
+                {"data": [], "totalPaginas": 1, "numeroPagina": 1}
+            ).encode(),
+        )
+        http = SequenceHttpClient([limited, success])
+
+        with (
+            patch(
+                "govdata_pncp.connector.monotonic",
+                side_effect=[0.0, 10.0, 10.0],
+            ),
+            patch(
+                "govdata_pncp.connector.asyncio.sleep",
+                new=AsyncMock(),
+            ) as sleep,
+        ):
+            page = asyncio.run(
+                PNCPConnector().fetch_page(
+                    "open-opportunities",
+                    {"dataFinal": "20260723"},
+                    None,
+                    http,
+                )
+            )
+
+        self.assertEqual(page.records, ())
+        self.assertEqual(len(http.urls), 2)
+        sleep.assert_awaited_once_with(7.0)
+
+    def test_fails_after_configured_rate_limit_retries(self) -> None:
+        http = FakeHttpClient({}, status=429)
+
+        with self.assertRaisesRegex(TransportError, "rate limit"):
+            asyncio.run(
+                PNCPConnector({"rate_limit_retries": 0}).fetch_page(
+                    "open-opportunities",
+                    {"dataFinal": "20260723"},
+                    None,
+                    http,
+                )
+            )
+
+    def test_validates_request_rate(self) -> None:
+        with self.assertRaises(ConnectorConfigurationError):
+            PNCPConnector({"requests_per_minute": 0})
 
 
 if __name__ == "__main__":
