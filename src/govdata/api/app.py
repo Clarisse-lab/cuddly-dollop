@@ -18,6 +18,12 @@ from govdata.bootstrap import create_registry, create_repository
 from govdata.core.ports import RecordQueryRepository
 from govdata.core.registry import ConnectorRegistry
 
+LOCAL_DEVELOPMENT_ORIGINS = (
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ApiSettings:
@@ -26,14 +32,14 @@ class ApiSettings:
 
     @classmethod
     def from_environment(cls) -> "ApiSettings":
-        raw_origins = os.getenv(
-            "GOVDATA_CORS_ORIGINS",
-            "http://localhost:3000,http://localhost:5173",
+        raw_origins = os.getenv("GOVDATA_CORS_ORIGINS", "")
+        configured_origins = tuple(
+            origin.strip() for origin in raw_origins.split(",") if origin.strip()
         )
         return cls(
             database=os.getenv("DATABASE_URL") or os.getenv("GOVDATA_DATABASE"),
             cors_origins=tuple(
-                origin.strip() for origin in raw_origins.split(",") if origin.strip()
+                dict.fromkeys((*LOCAL_DEVELOPMENT_ORIGINS, *configured_origins))
             ),
         )
 

@@ -78,6 +78,27 @@ govdata-api
 A API é somente de leitura. As sincronizações continuam no processo separado `govdata
 sync`, evitando manter requisições HTTP abertas durante coletas longas.
 
+## Dashboard web
+
+O primeiro painel visual fica em `frontend/` e usa diretamente a API de leitura. Ele
+apresenta indicadores consolidados, cobertura das fontes, distribuição territorial e
+um explorador de oportunidades abertas do PNCP com busca e filtros.
+
+Para testar localmente, mantenha a API em execução e sirva os arquivos estáticos:
+
+```powershell
+python -m http.server 5173 --directory frontend
+```
+
+Abra `http://127.0.0.1:5173`. A URL do backend fica em `frontend/config.js`; ela pode
+apontar para a API local ou para o domínio público do Railway. Essa URL não é segredo.
+Não abra `frontend/index.html` diretamente pelo Explorador de Arquivos: páginas
+`file://` não têm uma origem web autorizável e o navegador bloqueia a leitura da API.
+
+O `netlify.toml` publica diretamente a pasta `frontend`, sem etapa de build. Depois que
+o Netlify gerar o domínio do painel, inclua essa origem exata na variável
+`GOVDATA_CORS_ORIGINS` do serviço da API no Railway.
+
 ## PostgreSQL e migrations
 
 SQLite continua sendo o padrão para desenvolvimento. Para produção, instale o adaptador

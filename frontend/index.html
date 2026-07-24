@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Painel de inteligência sobre dados públicos brasileiros." />
+    <title>Dados Gov Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#" aria-label="Dados Gov Intelligence">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span><strong>Dados Gov</strong><small>Intelligence</small></span>
+        </a>
+        <nav class="main-nav" aria-label="Navegação principal">
+          <a class="nav-item active" href="#visao-geral"><span class="nav-icon">◫</span> Visão geral</a>
+          <a class="nav-item" href="#oportunidades"><span class="nav-icon">⌁</span> Oportunidades</a>
+          <a class="nav-item" href="#fontes"><span class="nav-icon">◎</span> Fontes de dados</a>
+        </nav>
+        <div class="sidebar-note">
+          <span class="pulse-dot"></span>
+          <div><strong>Dados rastreáveis</strong><p>Cada registro preserva a origem e a data da coleta.</p></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div><p class="eyebrow">HUB DE DADOS PÚBLICOS</p><h1>Visão geral</h1></div>
+          <div class="topbar-actions">
+            <div class="api-status" id="api-status"><span class="status-dot"></span><span>Conectando à API</span></div>
+            <button class="refresh-button" id="refresh-button" type="button"><span aria-hidden="true">↻</span> Atualizar</button>
+          </div>
+        </header>
+
+        <section id="visao-geral" aria-labelledby="overview-title">
+          <div class="section-heading">
+            <div><h2 id="overview-title">O pulso dos dados públicos</h2><p>Uma leitura consolidada das bases conectadas à plataforma.</p></div>
+            <p class="last-updated" id="last-updated">Aguardando dados...</p>
+          </div>
+          <div class="metric-grid">
+            <article class="metric-card accent-card">
+              <div class="metric-icon">⌁</div><div><p>Oportunidades abertas</p><strong id="metric-opportunities">—</strong><small>Portal Nacional de Contratações Públicas</small></div>
+            </article>
+            <article class="metric-card">
+              <div class="metric-icon teal">◉</div><div><p>Fontes conectadas</p><strong id="metric-connectors">—</strong><small id="metric-datasets">— conjuntos de dados</small></div>
+            </article>
+            <article class="metric-card">
+              <div class="metric-icon gold">◇</div><div><p>Registros catalogados</p><strong id="metric-records">—</strong><small>Nas bases sincronizadas</small></div>
+            </article>
+            <article class="metric-card">
+              <div class="metric-icon violet">↗</div><div><p>UFs na amostra</p><strong id="metric-states">—</strong><small>Com oportunidades identificadas</small></div>
+            </article>
+          </div>
+
+          <div class="insight-grid">
+            <article class="panel chart-panel">
+              <div class="panel-header">
+                <div><p class="panel-kicker">DISTRIBUIÇÃO TERRITORIAL</p><h3>Oportunidades por UF</h3></div>
+                <span class="sample-label" id="state-sample-label">Amostra atual</span>
+              </div>
+              <div class="bar-chart" id="state-chart"><div class="skeleton chart-skeleton"></div></div>
+            </article>
+            <article class="panel intelligence-panel">
+              <p class="panel-kicker">LEITURA RÁPIDA</p><h3>Destaques da coleta</h3>
+              <div class="insight-list" id="insight-list">
+                <div class="skeleton insight-skeleton"></div><div class="skeleton insight-skeleton"></div><div class="skeleton insight-skeleton"></div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="oportunidades" class="section-block" aria-labelledby="opportunities-title">
+          <div class="section-heading"><div><p class="panel-kicker">PNCP</p><h2 id="opportunities-title">Explorador de oportunidades</h2><p>Pesquise contratações abertas e acesse a evidência oficial.</p></div></div>
+          <div class="panel explorer-panel">
+            <div class="filter-bar">
+              <label class="search-field"><span aria-hidden="true">⌕</span><input id="search-input" type="search" placeholder="Buscar por objeto, órgão, município..." autocomplete="off" /></label>
+              <label class="select-field"><span>UF</span><select id="state-filter"><option value="">Todas</option></select></label>
+              <label class="select-field"><span>Ordenar</span><select id="sort-filter"><option value="recent">Mais recentes</option><option value="value-desc">Maior valor</option><option value="deadline">Encerram primeiro</option></select></label>
+            </div>
+            <div class="table-summary"><p id="result-count">Carregando oportunidades...</p><p id="sample-notice"></p></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Objeto da contratação</th><th>Órgão / Local</th><th>Valor estimado</th><th>Prazo</th><th></th></tr></thead>
+                <tbody id="opportunity-table">
+                  <tr class="loading-row"><td colspan="5"><div class="skeleton table-skeleton"></div></td></tr>
+                  <tr class="loading-row"><td colspan="5"><div class="skeleton table-skeleton"></div></td></tr>
+                  <tr class="loading-row"><td colspan="5"><div class="skeleton table-skeleton"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="fontes" class="section-block" aria-labelledby="sources-title">
+          <div class="section-heading"><div><p class="panel-kicker">CATÁLOGO</p><h2 id="sources-title">Fontes conectadas</h2><p>APIs públicas que alimentam o núcleo da plataforma.</p></div></div>
+          <div class="source-grid" id="source-grid"><div class="skeleton source-skeleton"></div><div class="skeleton source-skeleton"></div></div>
+        </section>
+
+        <footer><p>Dados Gov Intelligence · Dados públicos com contexto e rastreabilidade</p><a id="api-docs-link" href="#" target="_blank" rel="noreferrer">Documentação da API ↗</a></footer>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

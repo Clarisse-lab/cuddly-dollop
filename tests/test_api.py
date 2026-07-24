@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -105,6 +106,20 @@ class ApiTests(unittest.TestCase):
             response.headers["access-control-allow-origin"],
             "https://dashboard.example",
         )
+
+
+class ApiSettingsTests(unittest.TestCase):
+    def test_keeps_local_origins_alongside_deployed_frontend(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {"GOVDATA_CORS_ORIGINS": "https://dashboard.example"},
+            clear=True,
+        ):
+            settings = ApiSettings.from_environment()
+
+        self.assertIn("http://localhost:5173", settings.cors_origins)
+        self.assertIn("http://127.0.0.1:5173", settings.cors_origins)
+        self.assertIn("https://dashboard.example", settings.cors_origins)
 
 
 if __name__ == "__main__":
