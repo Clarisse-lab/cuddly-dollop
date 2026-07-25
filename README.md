@@ -283,6 +283,32 @@ Filtros oficiais do PNCP, como UF, município, CNPJ e modalidade, podem ser envi
 com `--param`. Cada oportunidade guarda o identificador oficial, a URL de consulta,
 a data de atualização da fonte e o histórico das mudanças do conteúdo.
 
+## Plugin do Transferegov
+
+O plugin em `plugins/govdata-transferegov` integra a API pública de Gestão de Parcerias
+do Transferegov sem exigir chave:
+
+```powershell
+python -m pip install -e .\plugins\govdata-transferegov
+govdata sync transferegov amendment-beneficiaries
+govdata sync transferegov payment-orders
+```
+
+`amendment-beneficiaries` traz CNPJ, município, UF, parlamentar, número da emenda e
+valores. `payment-orders` traz ordens de pagamento e bancárias, situação, datas e
+valor. Os dois datasets usam páginas de até 200 itens, limitação preventiva de
+requisições e repetição automática para falhas temporárias.
+
+Para produção, crie workers separados com
+`/railway.transferegov-beneficiaries-worker.toml` e
+`/railway.transferegov-payments-worker.toml`. Ambos precisam somente de:
+
+```text
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+```
+
+As coletas são agendadas diariamente às 11:00 e 12:00 UTC, respectivamente.
+
 ## Proveniência e histórico
 
 `records` mantém a versão atual de cada registro para consultas rápidas. A tabela

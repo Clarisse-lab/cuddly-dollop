@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "govdata-connector-transferegov"
+version = "0.1.0"
+description = "Conector do Transferegov para govdata-platform"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["govdata-platform>=0.1.0"]
+
+[project.entry-points."govdata.connectors"]
+transferegov = "govdata_transferegov.connector:TransferegovConnector"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/govdata_transferegov"]
