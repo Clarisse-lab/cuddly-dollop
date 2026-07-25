@@ -202,6 +202,18 @@ PNCP não exige chave. O conector limita a paginação a 12 requisições por mi
 aguarda automaticamente quando o serviço responde com HTTP 429 ou falhas temporárias
 HTTP 500, 502, 503 e 504.
 
+Para emendas parlamentares, crie um terceiro worker usando
+`/railway.emendas-worker.toml`. Ele compartilha as mesmas variáveis do worker do Portal:
+
+```text
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+PORTAL_TRANSPARENCIA_API_KEY=sua-chave-do-portal
+```
+
+O worker coleta diariamente as emendas do ano corrente às 10:00 UTC. Cargas históricas
+podem ser executadas pontualmente com
+`govdata sync transparencia emendas --param ano=2024`.
+
 ## Criando um conector externo
 
 Um pacote separado precisa apenas implementar o contrato estável:
@@ -248,7 +260,9 @@ python -m pip install -e .\plugins\govdata-transparencia
 $env:PORTAL_TRANSPARENCIA_API_KEY="sua-chave"
 govdata connectors
 govdata sync transparencia orgaos-siafi
+govdata sync transparencia emendas
 govdata records transparencia orgaos-siafi
+govdata records transparencia emendas --limit 10
 ```
 
 Consulte o README do plugin para detalhes. A chave nunca deve ser enviada como argumento

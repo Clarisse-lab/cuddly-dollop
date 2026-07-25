@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import os
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from time import monotonic
 from typing import Any, Mapping
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from govdata.core.errors import (
     ConnectorConfigurationError,
@@ -26,6 +27,10 @@ DATASETS = {
     "orgaos-siafi": DatasetDefinition(
         path="/api-de-dados/orgaos-siafi",
         id_field="codigo",
+    ),
+    "emendas": DatasetDefinition(
+        path="/api-de-dados/emendas",
+        id_field="codigoEmenda",
     ),
 }
 
@@ -81,6 +86,8 @@ class PortalTransparenciaConnector(PublicDataConnector):
             raise InvalidResponseError(f"unexpected dataset: {dataset}")
         page_number = self._page_number(cursor)
         query = {key: value for key, value in parameters.items() if key != "pagina"}
+        if dataset == "emendas":
+            query.setdefault("ano", datetime.now(UTC).year)
         query["pagina"] = page_number
         url = f"{self._base_url}{definition.path}?{urlencode(query, doseq=True)}"
 
@@ -103,13 +110,24 @@ class PortalTransparenciaConnector(PublicDataConnector):
                 ConnectorRecord(
                     external_id=str(item[definition.id_field]),
                     data=item,
-                    source_url=url,
+                    source_url=self._source_url(dataset, item, url),
                 )
             )
         return ConnectorPage(
             records=tuple(records),
             next_cursor=str(page_number + 1) if records else None,
         )
+
+    @staticmethod
+    def _source_url(dataset: str, item: Mapping[str, Any], fallback: str) -> str:
+        if dataset == "emendas":
+            code = item.get("codigoEmenda")
+            if code is not None:
+                return (
+                    "https://portaldatransparencia.gov.br/emendas/detalhe"
+                    f"?codigoEmenda={quote(str(code), safe='')}"
+                )
+        return fallback
 
     async def _respect_rate_limit(self) -> None:
         if self._last_request_at is None:

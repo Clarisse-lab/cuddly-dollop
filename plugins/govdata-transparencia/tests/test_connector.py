@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import unittest
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 from govdata.core.errors import (
@@ -67,6 +68,53 @@ class PortalTransparenciaConnectorTests(unittest.TestCase):
         )
 
         self.assertIsNone(page.next_cursor)
+
+    def test_fetches_current_year_amendments_with_official_source(self) -> None:
+        current_year = datetime.now(UTC).year
+        http = FakeHttp(
+            [
+                {
+                    "codigoEmenda": f"{current_year}12340001",
+                    "nomeAutor": "Autora Exemplo",
+                    "valorEmpenhado": 500000,
+                }
+            ]
+        )
+
+        page = asyncio.run(
+            self.connector().fetch_page("emendas", {}, None, http)
+        )
+
+        self.assertEqual(page.records[0].external_id, f"{current_year}12340001")
+        self.assertIn(f"ano={current_year}", http.calls[0][0])
+        self.assertEqual(
+            page.records[0].source_url,
+            "https://portaldatransparencia.gov.br/emendas/detalhe"
+            f"?codigoEmenda={current_year}12340001",
+        )
+
+    def test_accepts_historical_year_and_amendment_filters(self) -> None:
+        http = FakeHttp([])
+
+        asyncio.run(
+            self.connector().fetch_page(
+                "emendas",
+                {"ano": 2024, "nomeAutor": "Maria da Silva", "codigoUF": "35"},
+                None,
+                http,
+            )
+        )
+
+        url = http.calls[0][0]
+        self.assertIn("ano=2024", url)
+        self.assertIn("nomeAutor=Maria+da+Silva", url)
+        self.assertIn("codigoUF=35", url)
+
+    def test_rejects_amendment_without_stable_identifier(self) -> None:
+        with self.assertRaisesRegex(InvalidResponseError, "codigoEmenda"):
+            asyncio.run(
+                self.connector().fetch_page("emendas", {}, None, FakeHttp([{}]))
+            )
 
     def test_rejects_invalid_cursor(self) -> None:
         with self.assertRaises(InvalidResponseError):

@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "govdata sync transparencia emendas"
+cronSchedule = "0 10 * * *"
+restartPolicyType = "NEVER"
