@@ -62,9 +62,26 @@ def _transferegov_amendment_beneficiaries(data: Mapping[str, Any]) -> tuple[Enti
     return tuple(refs)
 
 
+def _transferegov_payment_documents(
+    data: Mapping[str, Any],
+) -> tuple[EntityReference, ...]:
+    cnpj = _cnpj(data.get("cd_credor_devedor"))
+    if not cnpj:
+        return ()
+    return (
+        EntityReference(
+            "organization",
+            cnpj,
+            data.get("nm_credor_devedor"),
+            role="payee",
+        ),
+    )
+
+
 EXTRACTORS: dict[tuple[str, str], ExtractorFn] = {
     ("pncp", "open-opportunities"): _pncp_open_opportunities,
     ("transferegov", "amendment-beneficiaries"): _transferegov_amendment_beneficiaries,
+    ("transferegov", "payment-documents"): _transferegov_payment_documents,
 }
 
 

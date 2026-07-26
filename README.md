@@ -291,23 +291,26 @@ do Transferegov sem exigir chave:
 ```powershell
 python -m pip install -e .\plugins\govdata-transferegov
 govdata sync transferegov amendment-beneficiaries
+govdata sync transferegov payment-documents
 govdata sync transferegov payment-orders
 ```
 
 `amendment-beneficiaries` traz CNPJ, município, UF, parlamentar, número da emenda e
-valores. `payment-orders` traz ordens de pagamento e bancárias, situação, datas e
-valor. Os dois datasets usam páginas de até 200 itens, limitação preventiva de
+valores. `payment-documents` traz o documento hábil com CNPJ e nome do credor,
+parceria, valor e data. `payment-orders` traz ordens de pagamento e bancárias,
+situação, datas e valor. Os datasets usam páginas de até 200 itens, limitação preventiva de
 requisições e repetição automática para falhas temporárias.
 
 Para produção, crie workers separados com
-`/railway.transferegov-beneficiaries-worker.toml` e
-`/railway.transferegov-payments-worker.toml`. Ambos precisam somente de:
+`/railway.transferegov-beneficiaries-worker.toml`,
+`/railway.transferegov-payment-documents-worker.toml` e
+`/railway.transferegov-payments-worker.toml`. Todos precisam somente de:
 
 ```text
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 ```
 
-As coletas são agendadas diariamente às 11:00 e 12:00 UTC, respectivamente.
+As coletas são agendadas diariamente às 11:00, 11:30 e 12:00 UTC, respectivamente.
 
 ## Proveniência e histórico
 
@@ -337,14 +340,16 @@ várias vezes não duplica nada.
 
 **Escopo desta primeira versão, de propósito:**
 
-- Só liga `pncp/open-opportunities` e `transferegov/amendment-beneficiaries` — os dois
-  únicos datasets com um campo de CNPJ confirmado nos testes dos conectores
-  (`orgaoEntidade.cnpj` e `nr_cnpj_beneficiario_emenda`). O UF de `unidadeOrgao.ufSigla`
+- Liga `pncp/open-opportunities`, `transferegov/amendment-beneficiaries` e
+  `transferegov/payment-documents`, que possuem campos de CNPJ confirmados
+  (`orgaoEntidade.cnpj`, `nr_cnpj_beneficiario_emenda` e `cd_credor_devedor`).
+  O UF de `unidadeOrgao.ufSigla`
   do PNCP é extraído de forma tolerante (best-effort), já que só foi observado no
   frontend, não confirmado nos testes do conector.
-- `transferegov/payment-orders` e `transparencia/emendas` ficam de fora até que o
-  formato real de um campo de vínculo (CNPJ, UF, número de emenda) seja confirmado —
-  adicionar uma fonte nova é só uma entrada no dicionário `EXTRACTORS`.
+- `transferegov/payment-orders` fica fora do vínculo direto porque não contém CNPJ.
+  Cada ordem preserva `id_documento_habil`, permitindo relacioná-la ao documento
+  hábil correspondente. `transparencia/emendas` também fica fora até que exista um
+  campo estruturado e confiável de vínculo.
 - CPF (pessoa física) é ignorado deliberadamente: `nr_cnpj_beneficiario_emenda` só vira
   entidade quando tem exatamente 14 dígitos. Não constrói um grafo de pessoas físicas
   a partir de dados públicos.

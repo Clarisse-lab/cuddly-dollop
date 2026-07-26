@@ -10,6 +10,7 @@ from govdata.application.entity_resolution import (
     _cnpj,
     _pncp_open_opportunities,
     _transferegov_amendment_beneficiaries,
+    _transferegov_payment_documents,
 )
 from govdata.core.entities import EntityReference
 from govdata.core.models import StoredRecord
@@ -91,6 +92,38 @@ class TransferegovExtractorTests(unittest.TestCase):
 
         self.assertNotIn("organization", [ref.entity_type for ref in refs])
         self.assertIn(EntityReference("location", "SP", role="beneficiary-location"), refs)
+
+    def test_extracts_payment_document_payee(self) -> None:
+        refs = _transferegov_payment_documents(
+            {
+                "cd_credor_devedor": "11.341.134/0001-92",
+                "nm_credor_devedor": "FUNDO MUNICIPAL DE SAUDE",
+                "id_parceria": 18573,
+            }
+        )
+
+        self.assertEqual(
+            refs,
+            (
+                EntityReference(
+                    "organization",
+                    "11341134000192",
+                    "FUNDO MUNICIPAL DE SAUDE",
+                    role="payee",
+                ),
+            ),
+        )
+
+    def test_skips_payment_document_without_cnpj(self) -> None:
+        self.assertEqual(
+            _transferegov_payment_documents(
+                {
+                    "cd_credor_devedor": "12345678900",
+                    "nm_credor_devedor": "Pessoa Fisica",
+                }
+            ),
+            (),
+        )
 
 
 class EntityResolutionServiceTests(unittest.TestCase):

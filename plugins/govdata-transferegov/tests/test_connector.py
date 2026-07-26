@@ -128,6 +128,44 @@ class TransferegovConnectorTests(unittest.TestCase):
         self.assertIsNone(page.records[0].source_updated_at)
         self.assertIsNone(page.next_cursor)
 
+    def test_maps_payment_document_with_confirmed_payee_cnpj(self) -> None:
+        payload = {
+            "data": [
+                {
+                    "id_documento_habil": 278,
+                    "id_parceria": 18573,
+                    "nr_documento_habil": "2025TF845786",
+                    "cd_credor_devedor": "11341134000192",
+                    "nm_credor_devedor": "FUNDO MUNICIPAL DE SAUDE",
+                    "vl_documento_habil": 600000.0,
+                    "dt_emissao": "2025-08-28T00:00:00",
+                }
+            ],
+            "total_pages": 1,
+            "total_items": 1,
+            "page_number": 1,
+            "page_size": 200,
+        }
+
+        page = asyncio.run(
+            self.connector().fetch_page(
+                "payment-documents",
+                {},
+                None,
+                FakeHttpClient(payload),
+            )
+        )
+
+        self.assertEqual(page.records[0].external_id, "278")
+        self.assertEqual(
+            page.records[0].data["cd_credor_devedor"],
+            "11341134000192",
+        )
+        self.assertIn(
+            "id_documento_habil=278",
+            page.records[0].source_url or "",
+        )
+
     def test_empty_last_page_finishes_pagination(self) -> None:
         payload = {
             "data": [],

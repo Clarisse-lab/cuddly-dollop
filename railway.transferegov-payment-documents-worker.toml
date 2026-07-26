@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "govdata sync transferegov payment-documents"
+cronSchedule = "30 11 * * *"
+restartPolicyType = "NEVER"

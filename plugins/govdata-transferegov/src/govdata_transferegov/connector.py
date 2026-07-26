@@ -31,6 +31,10 @@ DATASETS = {
         path="/beneficiario_emenda_parlamentar",
         id_field="id_beneficiario_emenda_parlamentar_programa",
     ),
+    "payment-documents": DatasetDefinition(
+        path="/documento-habil",
+        id_field="id_documento_habil",
+    ),
     "payment-orders": DatasetDefinition(
         path="/ordem-pagamento",
         id_field="id_op",
