@@ -35,3 +35,20 @@ class RecordPageResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class EntityLinkResponse(BaseModel):
+    connector_id: str
+    dataset: str
+    external_id: str
+    role: str | None
+    linked_at: datetime
+
+
+class EntityProfileResponse(BaseModel):
+    entity_type: str
+    entity_id: str
+    display_name: str | None
+    first_seen_at: datetime
+    last_seen_at: datetime
+    links: list[EntityLinkResponse]

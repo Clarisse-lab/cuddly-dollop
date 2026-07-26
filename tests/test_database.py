@@ -88,7 +88,12 @@ class SQLiteMigrationTests(unittest.TestCase):
                 count = connection.execute("SELECT COUNT(*) FROM records").fetchone()[0]
             self.assertEqual(
                 [row[0] for row in versions],
-                ["001_records.sql", "002_checkpoints.sql", "003_record_history.sql"],
+                [
+                    "001_records.sql",
+                    "002_checkpoints.sql",
+                    "003_record_history.sql",
+                    "004_entities.sql",
+                ],
             )
             self.assertEqual(count, 1)
 

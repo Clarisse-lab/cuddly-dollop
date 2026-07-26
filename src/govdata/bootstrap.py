@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+from govdata.application.entity_resolution import EntityResolutionService
 from govdata.application.sync import SyncService
 from govdata.connectors.ibge import IBGEConnector
 from govdata.core.ports import DataRepository
@@ -41,3 +42,9 @@ def create_sync_service(database: str | Path | None = None) -> SyncService:
         repository=create_repository(database),
         http=UrllibHttpClient(),
     )
+
+
+def create_entity_resolution_service(
+    database: str | Path | None = None,
+) -> EntityResolutionService:
+    return EntityResolutionService(repository=create_repository(database))

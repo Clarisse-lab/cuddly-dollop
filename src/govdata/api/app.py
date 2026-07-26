@@ -10,12 +10,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from govdata import __version__
 from govdata.api.schemas import (
     ConnectorResponse,
+    EntityLinkResponse,
+    EntityProfileResponse,
     HealthResponse,
     RecordPageResponse,
     RecordResponse,
 )
 from govdata.bootstrap import create_registry, create_repository
-from govdata.core.ports import RecordQueryRepository
+from govdata.core.ports import DataRepository
 from govdata.core.registry import ConnectorRegistry
 
 LOCAL_DEVELOPMENT_ORIGINS = (
@@ -48,7 +50,7 @@ def create_app(
     *,
     settings: ApiSettings | None = None,
     registry: ConnectorRegistry | None = None,
-    repository: RecordQueryRepository | None = None,
+    repository: DataRepository | None = None,
 ) -> FastAPI:
     settings = settings or ApiSettings.from_environment()
     registry = registry or create_registry()
@@ -127,6 +129,33 @@ def create_app(
             total=page.total,
             limit=page.limit,
             offset=page.offset,
+        )
+
+    @application.get(
+        "/api/v1/entities/{entity_type}/{entity_id}",
+        response_model=EntityProfileResponse,
+        tags=["entities"],
+    )
+    def entity(entity_type: str, entity_id: str) -> EntityProfileResponse:
+        profile = repository.get_entity_profile(entity_type, entity_id)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="entity not found")
+        return EntityProfileResponse(
+            entity_type=profile.entity.entity_type,
+            entity_id=profile.entity.entity_id,
+            display_name=profile.entity.display_name,
+            first_seen_at=profile.entity.first_seen_at,
+            last_seen_at=profile.entity.last_seen_at,
+            links=[
+                EntityLinkResponse(
+                    connector_id=link.connector_id,
+                    dataset=link.dataset,
+                    external_id=link.external_id,
+                    role=link.role,
+                    linked_at=link.linked_at,
+                )
+                for link in profile.links
+            ],
         )
 
     return application
