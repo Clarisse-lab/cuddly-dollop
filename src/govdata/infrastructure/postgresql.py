@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Iterator
 
+from govdata.core.entities import Entity, EntityLink, EntityProfile, EntityReference
 from govdata.core.errors import DatabaseConfigurationError, PersistenceError
 from govdata.core.models import RecordPage, StoredRecord
 from govdata.infrastructure.migrations import load_migrations
@@ -223,6 +224,86 @@ class PostgresRecordRepository:
             total=total,
             limit=limit,
             offset=offset,
+        )
+
+    def record_entity_links(
+        self,
+        connector_id: str,
+        dataset: str,
+        external_id: str,
+        refs: tuple[EntityReference, ...],
+        observed_at: datetime,
+    ) -> None:
+        with self._connect() as connection:
+            for ref in refs:
+                connection.execute(
+                    """
+                    INSERT INTO entities (
+                        entity_type, entity_id, display_name, first_seen_at, last_seen_at
+                    ) VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+                        display_name = COALESCE(excluded.display_name, entities.display_name),
+                        last_seen_at = excluded.last_seen_at
+                    """,
+                    (ref.entity_type, ref.entity_id, ref.display_name, observed_at, observed_at),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO entity_links (
+                        entity_type, entity_id, connector_id, dataset, external_id,
+                        role, linked_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(entity_type, entity_id, connector_id, dataset, external_id)
+                    DO UPDATE SET
+                        role = excluded.role,
+                        linked_at = excluded.linked_at
+                    """,
+                    (
+                        ref.entity_type,
+                        ref.entity_id,
+                        connector_id,
+                        dataset,
+                        external_id,
+                        ref.role,
+                        observed_at,
+                    ),
+                )
+
+    def get_entity_profile(self, entity_type: str, entity_id: str) -> EntityProfile | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT display_name, first_seen_at, last_seen_at FROM entities
+                WHERE entity_type = %s AND entity_id = %s""",
+                (entity_type, entity_id),
+            ).fetchone()
+            if row is None:
+                return None
+            links = connection.execute(
+                """
+                SELECT connector_id, dataset, external_id, role, linked_at
+                FROM entity_links WHERE entity_type = %s AND entity_id = %s
+                ORDER BY connector_id, dataset, external_id
+                """,
+                (entity_type, entity_id),
+            ).fetchall()
+        return EntityProfile(
+            entity=Entity(
+                entity_type=entity_type,
+                entity_id=entity_id,
+                display_name=row[0],
+                first_seen_at=self._datetime(row[1]),
+                last_seen_at=self._datetime(row[2]),
+            ),
+            links=tuple(
+                EntityLink(
+                    connector_id=link_row[0],
+                    dataset=link_row[1],
+                    external_id=link_row[2],
+                    role=link_row[3],
+                    linked_at=self._datetime(link_row[4]),
+                )
+                for link_row in links
+            ),
         )
 
     @staticmethod

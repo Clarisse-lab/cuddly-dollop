@@ -7,7 +7,12 @@ import os
 import sys
 from typing import Any
 
-from govdata.bootstrap import create_registry, create_repository, create_sync_service
+from govdata.bootstrap import (
+    create_entity_resolution_service,
+    create_registry,
+    create_repository,
+    create_sync_service,
+)
 from govdata.core.errors import GovDataError
 from govdata.core.models import SyncRequest
 
@@ -74,6 +79,10 @@ def build_parser() -> argparse.ArgumentParser:
     records.add_argument("connector")
     records.add_argument("dataset")
     records.add_argument("--limit", type=int, default=100)
+
+    subparsers.add_parser(
+        "link", help="resolve cross-source entities (organizations, locations)"
+    )
     return parser
 
 
@@ -111,6 +120,8 @@ def main(argv: list[str] | None = None) -> int:
                 "resumed_from": result.resumed_from,
                 "completed": result.completed,
             }
+        elif args.command == "link":
+            output = create_entity_resolution_service(args.database).run()
         else:
             output = create_repository(args.database).list_records(
                 args.connector, args.dataset, args.limit

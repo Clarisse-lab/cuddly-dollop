@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from govdata.api.app import ApiSettings, create_app
 from govdata.connectors.ibge import IBGEConnector
+from govdata.core.entities import EntityReference
 from govdata.core.models import StoredRecord
 from govdata.core.registry import ConnectorRegistry
 from govdata.infrastructure.sqlite import SQLiteRecordRepository
@@ -91,6 +92,28 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/api/v1/records/ibge/states?limit=1000")
 
         self.assertEqual(response.status_code, 422)
+
+    def test_returns_entity_profile_with_links(self) -> None:
+        self.repository.record_entity_links(
+            "pncp",
+            "open-opportunities",
+            "1",
+            (EntityReference("organization", "12345678000100", "Prefeitura", role="buyer"),),
+            datetime(2026, 7, 25, tzinfo=UTC),
+        )
+
+        response = self.client.get("/api/v1/entities/organization/12345678000100")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["display_name"], "Prefeitura")
+        self.assertEqual(body["links"][0]["connector_id"], "pncp")
+        self.assertEqual(body["links"][0]["role"], "buyer")
+
+    def test_returns_404_for_unknown_entity(self) -> None:
+        response = self.client.get("/api/v1/entities/organization/00000000000000")
+
+        self.assertEqual(response.status_code, 404)
 
     def test_cors_allows_configured_frontend(self) -> None:
         response = self.client.options(

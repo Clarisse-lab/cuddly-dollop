@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Mapping, Protocol
 
+from govdata.core.entities import EntityProfile, EntityReference
 from govdata.core.models import ConnectorPage, ConnectorSpec, RecordPage, StoredRecord
 
 
@@ -85,5 +87,20 @@ class RecordQueryRepository(Protocol):
     ) -> RecordPage: ...
 
 
-class DataRepository(RecordRepository, RecordQueryRepository, Protocol):
+class EntityRepository(Protocol):
+    def record_entity_links(
+        self,
+        connector_id: str,
+        dataset: str,
+        external_id: str,
+        refs: tuple[EntityReference, ...],
+        observed_at: datetime,
+    ) -> None: ...
+
+    def get_entity_profile(
+        self, entity_type: str, entity_id: str
+    ) -> EntityProfile | None: ...
+
+
+class DataRepository(RecordRepository, RecordQueryRepository, EntityRepository, Protocol):
     """Complete persistence contract used by API, CLI and synchronization."""

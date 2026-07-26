@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "govdata link"
+cronSchedule = "0 13 * * *"
+restartPolicyType = "NEVER"

@@ -318,6 +318,54 @@ permite reconstruir mudanças ao longo do tempo sem multiplicar versões idênti
 A API retorna `source_url` e `content_hash` junto de cada registro. Esses campos serão
 usados pelas futuras análises e respostas de IA para apresentar a evidência original.
 
+## Cruzamento de dados entre fontes
+
+Cada conector grava registros isolados por fonte. As tabelas `entities` e
+`entity_links` (migration `004_entities.sql`) formam uma camada separada que liga
+registros de fontes diferentes que se referem à mesma entidade do mundo real — o
+primeiro passo concreto para transformar coleta em inteligência.
+
+Rode a resolução depois de sincronizar os dados:
+
+```bash
+govdata link
+```
+
+O comando varre os datasets com regras de extração conhecidas
+(`src/govdata/application/entity_resolution.py`) e grava vínculos idempotentes; rodar
+várias vezes não duplica nada.
+
+**Escopo desta primeira versão, de propósito:**
+
+- Só liga `pncp/open-opportunities` e `transferegov/amendment-beneficiaries` — os dois
+  únicos datasets com um campo de CNPJ confirmado nos testes dos conectores
+  (`orgaoEntidade.cnpj` e `nr_cnpj_beneficiario_emenda`). O UF de `unidadeOrgao.ufSigla`
+  do PNCP é extraído de forma tolerante (best-effort), já que só foi observado no
+  frontend, não confirmado nos testes do conector.
+- `transferegov/payment-orders` e `transparencia/emendas` ficam de fora até que o
+  formato real de um campo de vínculo (CNPJ, UF, número de emenda) seja confirmado —
+  adicionar uma fonte nova é só uma entrada no dicionário `EXTRACTORS`.
+- CPF (pessoa física) é ignorado deliberadamente: `nr_cnpj_beneficiario_emenda` só vira
+  entidade quando tem exatamente 14 dígitos. Não constrói um grafo de pessoas físicas
+  a partir de dados públicos.
+- Cada execução refaz uma varredura completa dos datasets registrados (não é
+  incremental). Aceitável para o volume atual; uma versão futura pode reaproveitar a
+  tabela `checkpoints` com um cursor dedicado se os volumes crescerem muito.
+
+Consulte o resultado pela API:
+
+```text
+GET /api/v1/entities/organization/{cnpj}
+```
+
+Retorna o nome conhecido da entidade e todos os registros de todas as fontes já
+vinculados a ela (conector, dataset, id externo e o papel — `buyer`, `beneficiary` etc.).
+
+Em produção, `railway.entity-resolution-worker.toml` roda `govdata link` diariamente
+às 13:00 UTC, depois dos workers de sincronização. Ele quebra de propósito o padrão
+1 cron : 1 (conector, dataset) dos outros workers, já que o cruzamento em si depende
+de olhar mais de uma fonte na mesma execução.
+
 ## Desenvolvimento
 
 Os testes usam apenas a biblioteca padrão:
