@@ -14,5 +14,8 @@ dependencies = ["govdata-platform>=0.1.0"]
 [project.entry-points."govdata.connectors"]
 transparencia = "govdata_transparencia.connector:PortalTransparenciaConnector"
 
+[project.scripts]
+govdata-transparencia-sanctions = "govdata_transparencia.sanctions_worker:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/govdata_transparencia"]

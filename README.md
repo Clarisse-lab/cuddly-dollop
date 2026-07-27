@@ -216,8 +216,10 @@ podem ser executadas pontualmente com
 
 Para sanções e impedimentos, crie um worker usando
 `/railway.sanctions-worker.toml` com as mesmas variáveis do Portal. Ele executa
-`govdata sync-many transparencia ceis cnep cepim` diariamente às 02:00 UTC,
-sincronizando os três cadastros em sequência no mesmo serviço.
+`govdata-transparencia-sanctions` diariamente às 02:00 UTC. De segunda a sábado,
+CEIS e CNEP usam uma janela móvel de 30 dias. Aos domingos, o worker reconcilia
+integralmente CEIS, CNEP e CEPIM. Uma carga completa manual pode ser iniciada com
+`govdata-transparencia-sanctions --full`.
 
 ## Criando um conector externo
 

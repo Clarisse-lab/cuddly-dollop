@@ -38,7 +38,13 @@ govdata sync transparencia emendas --param ano=2024
 govdata sync transparencia emendas --param ano=2025 --param nomeAutor="Nome do autor"
 govdata records transparencia emendas --limit 10
 govdata sync-many transparencia ceis cnep cepim
+govdata-transparencia-sanctions
+govdata-transparencia-sanctions --full
 ```
+
+O worker de sanções usa uma janela móvel de 30 dias para CEIS e CNEP nos dias úteis.
+Aos domingos, refaz a carga completa de CEIS, CNEP e CEPIM para reconciliar correções
+retroativas. Use `--full` apenas quando precisar forçar uma reconciliação manual.
 
 O catálogo `DATASETS` em `connector.py` permite acrescentar novos endpoints mantendo a
 autenticação, paginação, limitação de chamadas e tratamento de erros compartilhados.

@@ -3,6 +3,6 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "govdata sync-many transparencia ceis cnep cepim"
+startCommand = "govdata-transparencia-sanctions"
 cronSchedule = "0 2 * * *"
 restartPolicyType = "NEVER"
