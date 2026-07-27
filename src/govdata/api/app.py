@@ -13,8 +13,13 @@ from govdata.api.schemas import (
     EntityLinkResponse,
     EntityProfileResponse,
     HealthResponse,
+    OrganizationActivityResponse,
+    OrganizationOverviewResponse,
     RecordPageResponse,
     RecordResponse,
+)
+from govdata.application.organization_intelligence import (
+    OrganizationIntelligenceService,
 )
 from govdata.bootstrap import create_registry, create_repository
 from govdata.core.ports import DataRepository
@@ -55,6 +60,7 @@ def create_app(
     settings = settings or ApiSettings.from_environment()
     registry = registry or create_registry()
     repository = repository or create_repository(settings.database)
+    organization_intelligence = OrganizationIntelligenceService(repository)
 
     application = FastAPI(
         title="Dados Gov API",
@@ -155,6 +161,42 @@ def create_app(
                     linked_at=link.linked_at,
                 )
                 for link in profile.links
+            ],
+        )
+
+    @application.get(
+        "/api/v1/organizations/{cnpj}/overview",
+        response_model=OrganizationOverviewResponse,
+        tags=["intelligence"],
+    )
+    def organization_overview(cnpj: str) -> OrganizationOverviewResponse:
+        normalized_cnpj = "".join(character for character in cnpj if character.isdigit())
+        if len(normalized_cnpj) != 14:
+            raise HTTPException(status_code=422, detail="CNPJ must contain 14 digits")
+        overview = organization_intelligence.get(normalized_cnpj)
+        if overview is None:
+            raise HTTPException(status_code=404, detail="organization not found")
+        return OrganizationOverviewResponse(
+            cnpj=overview.cnpj,
+            name=overview.name,
+            first_seen_at=overview.first_seen_at,
+            last_seen_at=overview.last_seen_at,
+            sources=list(overview.sources),
+            counts=dict(overview.counts),
+            totals=dict(overview.totals),
+            activities=[
+                OrganizationActivityResponse(
+                    category=item.category,
+                    dataset=item.dataset,
+                    external_id=item.external_id,
+                    title=item.title,
+                    description=item.description,
+                    amount=item.amount,
+                    occurred_at=item.occurred_at,
+                    status=item.status,
+                    source_url=item.source_url,
+                )
+                for item in overview.activities
             ],
         )
 

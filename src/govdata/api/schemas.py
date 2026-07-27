@@ -52,3 +52,26 @@ class EntityProfileResponse(BaseModel):
     first_seen_at: datetime
     last_seen_at: datetime
     links: list[EntityLinkResponse]
+
+
+class OrganizationActivityResponse(BaseModel):
+    category: str
+    dataset: str
+    external_id: str
+    title: str
+    description: str | None
+    amount: float | None
+    occurred_at: datetime | None
+    status: str | None
+    source_url: str | None
+
+
+class OrganizationOverviewResponse(BaseModel):
+    cnpj: str
+    name: str | None
+    first_seen_at: datetime
+    last_seen_at: datetime
+    sources: list[str]
+    counts: dict[str, int]
+    totals: dict[str, float]
+    activities: list[OrganizationActivityResponse]

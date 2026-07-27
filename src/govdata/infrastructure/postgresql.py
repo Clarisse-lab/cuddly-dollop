@@ -7,6 +7,7 @@ from typing import Any, Iterator
 from govdata.core.entities import (
     Entity,
     EntityLink,
+    EntityLinkedRecord,
     EntityProfile,
     EntityRecordReferences,
     EntityReference,
@@ -345,6 +346,42 @@ class PostgresRecordRepository:
                 )
                 for link_row in links
             ),
+        )
+
+    def get_entity_records(
+        self, entity_type: str, entity_id: str
+    ) -> tuple[EntityLinkedRecord, ...]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    links.connector_id, links.dataset, links.external_id,
+                    links.role, links.linked_at, records.data_json,
+                    records.collected_at, records.source_updated_at,
+                    records.source_url
+                FROM entity_links AS links
+                JOIN records
+                  ON records.connector_id = links.connector_id
+                 AND records.dataset = links.dataset
+                 AND records.external_id = links.external_id
+                WHERE links.entity_type = %s AND links.entity_id = %s
+                ORDER BY records.collected_at DESC, links.external_id
+                """,
+                (entity_type, entity_id),
+            ).fetchall()
+        return tuple(
+            EntityLinkedRecord(
+                connector_id=row[0],
+                dataset=row[1],
+                external_id=row[2],
+                role=row[3],
+                linked_at=self._datetime(row[4]),
+                data=row[5],
+                collected_at=self._datetime(row[6]),
+                source_updated_at=self._datetime(row[7]) if row[7] else None,
+                source_url=row[8],
+            )
+            for row in rows
         )
 
     @staticmethod

@@ -252,6 +252,60 @@ class EntityResolutionServiceTests(unittest.TestCase):
             self.assertEqual(summary["links_written"], 3)
             self.assertEqual(batch_write.call_count, 1)
 
+    def test_links_payment_order_through_its_payment_document(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repository = SQLiteRecordRepository(Path(temp) / "payments.sqlite3")
+            collected_at = datetime(2026, 7, 25, tzinfo=UTC)
+            repository.commit_page(
+                "transferegov",
+                "payment-documents",
+                "scope",
+                (
+                    StoredRecord(
+                        connector_id="transferegov",
+                        dataset="payment-documents",
+                        external_id="278",
+                        data={
+                            "id_documento_habil": 278,
+                            "cd_credor_devedor": "11341134000192",
+                            "nm_credor_devedor": "FUNDO MUNICIPAL DE SAUDE",
+                        },
+                        collected_at=collected_at,
+                    ),
+                ),
+                None,
+            )
+            repository.commit_page(
+                "transferegov",
+                "payment-orders",
+                "scope",
+                (
+                    StoredRecord(
+                        connector_id="transferegov",
+                        dataset="payment-orders",
+                        external_id="276",
+                        data={
+                            "id_op": 276,
+                            "id_documento_habil": 278,
+                            "in_situacao_op": "Paga",
+                        },
+                        collected_at=collected_at,
+                    ),
+                ),
+                None,
+            )
+
+            summary = EntityResolutionService(repository).run()
+            profile = repository.get_entity_profile("organization", "11341134000192")
+
+            self.assertEqual(summary["records_processed"], 2)
+            self.assertEqual(summary["links_written"], 2)
+            assert profile is not None
+            self.assertEqual(
+                {link.dataset for link in profile.links},
+                {"payment-documents", "payment-orders"},
+            )
+
     def test_returns_none_for_unknown_entity(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "empty.sqlite3"

@@ -1,5 +1,12 @@
 const API_URL = (window.GOVDATA_CONFIG?.API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
-const state = { connectors: [], summaries: [], opportunities: [], opportunityTotal: 0 };
+const state = {
+  connectors: [],
+  summaries: [],
+  opportunities: [],
+  opportunityTotal: 0,
+  organizationOverview: null,
+  organizationCategory: "amendments",
+};
 const elements = {
   apiStatus: document.querySelector("#api-status"),
   refreshButton: document.querySelector("#refresh-button"),
@@ -19,6 +26,17 @@ const elements = {
   sampleNotice: document.querySelector("#sample-notice"),
   opportunityTable: document.querySelector("#opportunity-table"),
   sourceGrid: document.querySelector("#source-grid"),
+  organizationSearchForm: document.querySelector("#organization-search-form"),
+  organizationCnpjInput: document.querySelector("#organization-cnpj-input"),
+  organizationSearchButton: document.querySelector("#organization-search-button"),
+  organizationEmpty: document.querySelector("#organization-empty"),
+  organizationResult: document.querySelector("#organization-result"),
+  organizationName: document.querySelector("#organization-name"),
+  organizationCnpj: document.querySelector("#organization-cnpj"),
+  organizationSources: document.querySelector("#organization-sources"),
+  organizationMetrics: document.querySelector("#organization-metrics"),
+  organizationTabs: document.querySelector("#organization-tabs"),
+  organizationActivities: document.querySelector("#organization-activities"),
   apiDocsLink: document.querySelector("#api-docs-link"),
   toast: document.querySelector("#toast"),
 };
@@ -40,8 +58,17 @@ function safeUrl(value) {
 }
 async function fetchJson(path) {
   const response = await fetch(`${API_URL}${path}`, { headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`A API respondeu com status ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(`A API respondeu com status ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
   return response.json();
+}
+function formatCnpj(value) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (digits.length !== 14) return digits;
+  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 }
 function setApiStatus(mode, message) {
   elements.apiStatus.className = `api-status ${mode}`;
@@ -164,6 +191,97 @@ function renderSources() {
     </article>`;
   }).join("");
 }
+function metricCard(label, count, total, detail = "") {
+  return `<div class="organization-metric">
+    <p>${escapeHtml(label)}</p>
+    <strong>${numberFormat.format(count || 0)}</strong>
+    <span>${currencyFormat.format(total || 0)}</span>
+    ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
+  </div>`;
+}
+function renderOrganization() {
+  const overview = state.organizationOverview;
+  if (!overview) return;
+  elements.organizationName.textContent = overview.name || "Organização sem nome informado";
+  elements.organizationCnpj.textContent = formatCnpj(overview.cnpj);
+  elements.organizationSources.innerHTML = overview.sources.map((source) => `<span>${escapeHtml(source)}</span>`).join("");
+  elements.organizationMetrics.innerHTML = [
+    metricCard("Emendas", overview.counts.amendments, overview.totals.amendments),
+    metricCard(
+      "Ordens de pagamento",
+      overview.counts.payment_orders,
+      overview.totals.payment_orders,
+      `${numberFormat.format(overview.counts.paid_orders || 0)} pagas`,
+    ),
+    metricCard("Documentos de pagamento", overview.counts.payment_documents, overview.totals.payment_documents),
+    metricCard("Licitações", overview.counts.opportunities, overview.totals.opportunities),
+  ].join("");
+  elements.organizationEmpty.hidden = true;
+  elements.organizationResult.hidden = false;
+  renderOrganizationActivities();
+}
+function renderOrganizationActivities() {
+  const overview = state.organizationOverview;
+  if (!overview) return;
+  const category = state.organizationCategory;
+  const records = overview.activities.filter((activity) => activity.category === category);
+  elements.organizationTabs.querySelectorAll("button").forEach((button) => {
+    const selected = button.dataset.category === category;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", String(selected));
+  });
+  if (!records.length) {
+    elements.organizationActivities.innerHTML = '<p class="empty-state">Nenhuma atividade desta categoria foi encontrada para o CNPJ.</p>';
+    return;
+  }
+  elements.organizationActivities.innerHTML = records.map((activity) => {
+    const occurredAt = activity.occurred_at ? dateFormat.format(new Date(activity.occurred_at)) : "Data não informada";
+    const sourceUrl = safeUrl(activity.source_url);
+    return `<div class="activity-item">
+      <div class="activity-date">${escapeHtml(occurredAt)}</div>
+      <div class="activity-content">
+        <div class="activity-title-row">
+          <strong>${escapeHtml(activity.title)}</strong>
+          ${activity.status ? `<span class="activity-status">${escapeHtml(activity.status)}</span>` : ""}
+        </div>
+        ${activity.description ? `<p>${escapeHtml(activity.description)}</p>` : ""}
+        <small>${escapeHtml(activity.dataset)} · ${escapeHtml(activity.external_id)}</small>
+      </div>
+      <div class="activity-amount">
+        <strong>${activity.amount == null ? "Valor não informado" : escapeHtml(currencyFormat.format(activity.amount))}</strong>
+        ${sourceUrl === "#" ? "" : `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noreferrer">Fonte oficial ↗</a>`}
+      </div>
+    </div>`;
+  }).join("");
+}
+async function searchOrganization(event) {
+  event.preventDefault();
+  const cnpj = elements.organizationCnpjInput.value.replace(/\D/g, "");
+  if (cnpj.length !== 14) {
+    showToast("Digite um CNPJ com 14 números.");
+    elements.organizationCnpjInput.focus();
+    return;
+  }
+  elements.organizationSearchButton.disabled = true;
+  elements.organizationSearchButton.textContent = "Buscando...";
+  try {
+    state.organizationOverview = await fetchJson(`/api/v1/organizations/${cnpj}/overview`);
+    state.organizationCategory = "amendments";
+    renderOrganization();
+    elements.organizationResult.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    state.organizationOverview = null;
+    elements.organizationResult.hidden = true;
+    elements.organizationEmpty.hidden = false;
+    elements.organizationEmpty.innerHTML = error.status === 404
+      ? '<span class="organization-empty-icon" aria-hidden="true">∅</span><div><h3>CNPJ ainda não encontrado</h3><p>Não há vínculos catalogados para esta organização nas bases já cruzadas.</p></div>'
+      : '<span class="organization-empty-icon" aria-hidden="true">!</span><div><h3>Não foi possível consultar</h3><p>Verifique a conexão com a API e tente novamente.</p></div>';
+    showToast(error.status === 404 ? "CNPJ não encontrado nas bases cruzadas." : error.message);
+  } finally {
+    elements.organizationSearchButton.disabled = false;
+    elements.organizationSearchButton.textContent = "Investigar";
+  }
+}
 async function loadDashboard() {
   elements.refreshButton.classList.add("loading");
   elements.refreshButton.disabled = true;
@@ -215,6 +333,13 @@ async function loadDashboard() {
 elements.searchInput.addEventListener("input", renderOpportunities);
 elements.stateFilter.addEventListener("change", renderOpportunities);
 elements.sortFilter.addEventListener("change", renderOpportunities);
+elements.organizationSearchForm.addEventListener("submit", searchOrganization);
+elements.organizationTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-category]");
+  if (!button) return;
+  state.organizationCategory = button.dataset.category;
+  renderOrganizationActivities();
+});
 elements.refreshButton.addEventListener("click", loadDashboard);
 elements.apiDocsLink.href = `${API_URL}/docs`;
 loadDashboard();

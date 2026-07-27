@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Mapping, Protocol
 
 from govdata.core.entities import (
+    EntityLinkedRecord,
     EntityProfile,
     EntityRecordReferences,
     EntityReference,
@@ -112,6 +113,10 @@ class EntityRepository(Protocol):
     def get_entity_profile(
         self, entity_type: str, entity_id: str
     ) -> EntityProfile | None: ...
+
+    def get_entity_records(
+        self, entity_type: str, entity_id: str
+    ) -> tuple[EntityLinkedRecord, ...]: ...
 
 
 class DataRepository(RecordRepository, RecordQueryRepository, EntityRepository, Protocol):

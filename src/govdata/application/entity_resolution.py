@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -85,6 +86,26 @@ EXTRACTORS: dict[tuple[str, str], ExtractorFn] = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class ReferenceJoinRule:
+    connector_id: str
+    reference_dataset: str
+    target_dataset: str
+    target_reference_field: str
+    reference_extractor: ExtractorFn
+
+
+REFERENCE_JOIN_RULES = (
+    ReferenceJoinRule(
+        connector_id="transferegov",
+        reference_dataset="payment-documents",
+        target_dataset="payment-orders",
+        target_reference_field="id_documento_habil",
+        reference_extractor=_transferegov_payment_documents,
+    ),
+)
+
+
 class EntityResolutionService:
     def __init__(self, repository: DataRepository) -> None:
         self._repository = repository
@@ -125,4 +146,72 @@ class EntityResolutionService:
                 if offset >= page.total:
                     break
 
+        for rule in REFERENCE_JOIN_RULES:
+            reference_map = self._load_reference_map(rule, batch_size)
+            offset = 0
+            while True:
+                page = self._repository.query_records(
+                    rule.connector_id,
+                    rule.target_dataset,
+                    limit=batch_size,
+                    offset=offset,
+                )
+                if not page.records:
+                    break
+                batch: list[EntityRecordReferences] = []
+                for record in page.records:
+                    reference_value = record.data.get(rule.target_reference_field)
+                    reference_id = self._reference_id(reference_value)
+                    refs = reference_map.get(reference_id, ()) if reference_id else ()
+                    if refs:
+                        batch.append(
+                            EntityRecordReferences(
+                                external_id=record.external_id,
+                                references=refs,
+                            )
+                        )
+                        links_written += len(refs)
+                    records_processed += 1
+                if batch:
+                    self._repository.record_entity_links_batch(
+                        rule.connector_id,
+                        rule.target_dataset,
+                        tuple(batch),
+                        observed_at,
+                    )
+                offset += len(page.records)
+                if offset >= page.total:
+                    break
+
         return {"records_processed": records_processed, "links_written": links_written}
+
+    def _load_reference_map(
+        self,
+        rule: ReferenceJoinRule,
+        batch_size: int,
+    ) -> dict[str, tuple[EntityReference, ...]]:
+        references: dict[str, tuple[EntityReference, ...]] = {}
+        offset = 0
+        while True:
+            page = self._repository.query_records(
+                rule.connector_id,
+                rule.reference_dataset,
+                limit=batch_size,
+                offset=offset,
+            )
+            if not page.records:
+                break
+            for record in page.records:
+                refs = rule.reference_extractor(record.data)
+                if refs:
+                    references[record.external_id] = refs
+            offset += len(page.records)
+            if offset >= page.total:
+                break
+        return references
+
+    @staticmethod
+    def _reference_id(value: Any) -> str | None:
+        if value is None or isinstance(value, bool):
+            return None
+        return str(value)

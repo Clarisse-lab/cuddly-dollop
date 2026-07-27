@@ -115,6 +115,52 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_returns_organization_overview(self) -> None:
+        cnpj = "12345678000100"
+        self.repository.commit_page(
+            "pncp",
+            "open-opportunities",
+            "overview-scope",
+            (
+                StoredRecord(
+                    connector_id="pncp",
+                    dataset="open-opportunities",
+                    external_id="opportunity-1",
+                    data={
+                        "orgaoEntidade": {
+                            "cnpj": cnpj,
+                            "razaoSocial": "Prefeitura",
+                        },
+                        "objetoCompra": "Aquisição de equipamentos",
+                        "valorTotalEstimado": 150000,
+                    },
+                    collected_at=datetime(2026, 7, 25, tzinfo=UTC),
+                ),
+            ),
+            None,
+        )
+        self.repository.record_entity_links(
+            "pncp",
+            "open-opportunities",
+            "opportunity-1",
+            (EntityReference("organization", cnpj, "Prefeitura", role="buyer"),),
+            datetime(2026, 7, 25, tzinfo=UTC),
+        )
+
+        response = self.client.get(f"/api/v1/organizations/{cnpj}/overview")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["name"], "Prefeitura")
+        self.assertEqual(body["counts"]["opportunities"], 1)
+        self.assertEqual(body["totals"]["opportunities"], 150000)
+        self.assertEqual(body["activities"][0]["category"], "opportunities")
+
+    def test_rejects_invalid_cnpj_overview(self) -> None:
+        response = self.client.get("/api/v1/organizations/123/overview")
+
+        self.assertEqual(response.status_code, 422)
+
     def test_cors_allows_configured_frontend(self) -> None:
         response = self.client.options(
             "/api/v1/connectors",

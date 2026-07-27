@@ -21,6 +21,7 @@
           <a class="nav-item active" href="#visao-geral"><span class="nav-icon">◫</span> Visão geral</a>
           <a class="nav-item" href="#oportunidades"><span class="nav-icon">⌁</span> Oportunidades</a>
           <a class="nav-item" href="#fontes"><span class="nav-icon">◎</span> Fontes de dados</a>
+          <a class="nav-item" href="#organizacoes"><span class="nav-icon">◎</span> Radar de organizações</a>
         </nav>
         <div class="sidebar-note">
           <span class="pulse-dot"></span>
@@ -70,6 +71,60 @@
               <div class="insight-list" id="insight-list">
                 <div class="skeleton insight-skeleton"></div><div class="skeleton insight-skeleton"></div><div class="skeleton insight-skeleton"></div>
               </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="organizacoes" class="section-block" aria-labelledby="organizations-title">
+          <div class="section-heading organization-heading">
+            <div>
+              <p class="panel-kicker">CRUZAMENTO DE DADOS</p>
+              <h2 id="organizations-title">Radar de organizações</h2>
+              <p>Consulte um CNPJ e veja os vínculos encontrados entre as bases públicas.</p>
+            </div>
+            <form class="organization-search" id="organization-search-form">
+              <label for="organization-cnpj-input">CNPJ</label>
+              <div class="organization-search-row">
+                <input id="organization-cnpj-input" type="search" inputmode="numeric" placeholder="11.413.810/0001-96" autocomplete="off" />
+                <button id="organization-search-button" type="submit">Investigar</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="panel organization-empty" id="organization-empty">
+            <span class="organization-empty-icon" aria-hidden="true">⌕</span>
+            <div>
+              <h3>Comece por um CNPJ</h3>
+              <p>O Radar reúne emendas, pagamentos e licitações ligados à mesma organização, preservando a fonte de cada informação.</p>
+            </div>
+          </div>
+
+          <div class="organization-result" id="organization-result" hidden>
+            <article class="panel organization-profile">
+              <div class="organization-profile-top">
+                <div>
+                  <p class="panel-kicker">ORGANIZAÇÃO IDENTIFICADA</p>
+                  <h3 id="organization-name">—</h3>
+                  <p class="organization-cnpj" id="organization-cnpj">—</p>
+                </div>
+                <div class="organization-sources" id="organization-sources"></div>
+              </div>
+              <div class="organization-metrics" id="organization-metrics"></div>
+            </article>
+
+            <article class="panel activity-panel">
+              <div class="panel-header activity-header">
+                <div>
+                  <p class="panel-kicker">HISTÓRICO CONSOLIDADO</p>
+                  <h3>Atividades encontradas</h3>
+                </div>
+                <div class="activity-tabs" id="organization-tabs" role="tablist" aria-label="Tipos de atividade">
+                  <button class="active" type="button" data-category="amendments">Emendas</button>
+                  <button type="button" data-category="payments">Pagamentos</button>
+                  <button type="button" data-category="opportunities">Licitações</button>
+                </div>
+              </div>
+              <div class="activity-list" id="organization-activities"></div>
             </article>
           </div>
         </section>
