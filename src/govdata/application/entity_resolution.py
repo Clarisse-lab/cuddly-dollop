@@ -79,10 +79,60 @@ def _transferegov_payment_documents(
     )
 
 
+def _transparency_sanction(
+    data: Mapping[str, Any],
+    *,
+    container_name: str,
+    identifier_field: str,
+) -> tuple[EntityReference, ...]:
+    container = data.get(container_name)
+    if not isinstance(container, Mapping):
+        return ()
+    cnpj = _cnpj(container.get(identifier_field))
+    if not cnpj:
+        return ()
+    display_name = (
+        container.get("razaoSocialReceita")
+        or container.get("nome")
+        or container.get("nomeFantasiaReceita")
+    )
+    return (
+        EntityReference(
+            "organization",
+            cnpj,
+            display_name,
+            role="sanctioned",
+        ),
+    )
+
+
+def _transparency_ceis_cnep(
+    data: Mapping[str, Any],
+) -> tuple[EntityReference, ...]:
+    return _transparency_sanction(
+        data,
+        container_name="sancionado",
+        identifier_field="codigoFormatado",
+    )
+
+
+def _transparency_cepim(
+    data: Mapping[str, Any],
+) -> tuple[EntityReference, ...]:
+    return _transparency_sanction(
+        data,
+        container_name="pessoaJuridica",
+        identifier_field="cnpjFormatado",
+    )
+
+
 EXTRACTORS: dict[tuple[str, str], ExtractorFn] = {
     ("pncp", "open-opportunities"): _pncp_open_opportunities,
     ("transferegov", "amendment-beneficiaries"): _transferegov_amendment_beneficiaries,
     ("transferegov", "payment-documents"): _transferegov_payment_documents,
+    ("transparencia", "ceis"): _transparency_ceis_cnep,
+    ("transparencia", "cnep"): _transparency_ceis_cnep,
+    ("transparencia", "cepim"): _transparency_cepim,
 }
 
 

@@ -214,6 +214,11 @@ O worker coleta diariamente as emendas do ano corrente às 10:00 UTC. Cargas his
 podem ser executadas pontualmente com
 `govdata sync transparencia emendas --param ano=2024`.
 
+Para sanções e impedimentos, crie um worker usando
+`/railway.sanctions-worker.toml` com as mesmas variáveis do Portal. Ele executa
+`govdata sync-many transparencia ceis cnep cepim` diariamente às 02:00 UTC,
+sincronizando os três cadastros em sequência no mesmo serviço.
+
 ## Criando um conector externo
 
 Um pacote separado precisa apenas implementar o contrato estável:
@@ -344,16 +349,17 @@ uma transação para cada registro individual.
 
 **Escopo desta primeira versão, de propósito:**
 
-- Liga `pncp/open-opportunities`, `transferegov/amendment-beneficiaries` e
-  `transferegov/payment-documents`, que possuem campos de CNPJ confirmados
+- Liga `pncp/open-opportunities`, `transferegov/amendment-beneficiaries`,
+  `transferegov/payment-documents` e os cadastros `transparencia/ceis`,
+  `transparencia/cnep` e `transparencia/cepim`, que possuem campos de CNPJ confirmados
   (`orgaoEntidade.cnpj`, `nr_cnpj_beneficiario_emenda` e `cd_credor_devedor`).
   O UF de `unidadeOrgao.ufSigla`
   do PNCP é extraído de forma tolerante (best-effort), já que só foi observado no
   frontend, não confirmado nos testes do conector.
-- `transferegov/payment-orders` fica fora do vínculo direto porque não contém CNPJ.
-  Cada ordem preserva `id_documento_habil`, permitindo relacioná-la ao documento
-  hábil correspondente. `transparencia/emendas` também fica fora até que exista um
-  campo estruturado e confiável de vínculo.
+- `transferegov/payment-orders` não contém CNPJ diretamente, mas é ligado pelo
+  `id_documento_habil` ao documento de pagamento correspondente. CEIS, CNEP e CEPIM
+  usam os campos oficiais de CNPJ do sancionado. `transparencia/emendas` continua fora
+  até que exista um campo estruturado e confiável de vínculo.
 - CPF (pessoa física) é ignorado deliberadamente: `nr_cnpj_beneficiario_emenda` só vira
   entidade quando tem exatamente 14 dígitos. Não constrói um grafo de pessoas físicas
   a partir de dados públicos.

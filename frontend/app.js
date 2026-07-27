@@ -196,11 +196,11 @@ function renderSources() {
     </article>`;
   }).join("");
 }
-function metricCard(label, count, total, detail = "") {
+function metricCard(label, count, total, detail = "", showTotal = true) {
   return `<div class="organization-metric">
     <p>${escapeHtml(label)}</p>
     <strong>${numberFormat.format(count || 0)}</strong>
-    <span>${currencyFormat.format(total || 0)}</span>
+    ${showTotal ? `<span>${currencyFormat.format(total || 0)}</span>` : ""}
     ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
   </div>`;
 }
@@ -220,6 +220,13 @@ function renderOrganization() {
     ),
     metricCard("Documentos de pagamento", overview.counts.payment_documents, overview.totals.payment_documents),
     metricCard("Licitações", overview.counts.opportunities, overview.totals.opportunities),
+    metricCard(
+      "Sanções e impedimentos",
+      overview.counts.integrity_occurrences,
+      0,
+      `${numberFormat.format(overview.counts.ceis || 0)} CEIS · ${numberFormat.format(overview.counts.cnep || 0)} CNEP · ${numberFormat.format(overview.counts.cepim || 0)} CEPIM`,
+      false,
+    ),
   ].join("");
   elements.organizationEmpty.hidden = true;
   elements.organizationResult.hidden = false;

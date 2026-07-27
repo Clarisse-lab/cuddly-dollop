@@ -75,6 +75,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sync.add_argument("--restart", action="store_true")
 
+    sync_many = subparsers.add_parser(
+        "sync-many", help="synchronize multiple datasets from one connector"
+    )
+    sync_many.add_argument("connector")
+    sync_many.add_argument("datasets", nargs="+")
+    sync_many.add_argument(
+        "--config", type=_json_object, default={}, help="configuration as JSON"
+    )
+    sync_many.add_argument(
+        "--set-config",
+        action="append",
+        type=_key_value,
+        default=[],
+        metavar="KEY=VALUE",
+        help="repeatable connector configuration",
+    )
+    sync_many.add_argument("--restart", action="store_true")
+
     records = subparsers.add_parser("records", help="read collected records")
     records.add_argument("connector")
     records.add_argument("dataset")
@@ -120,6 +138,34 @@ def main(argv: list[str] | None = None) -> int:
                 "resumed_from": result.resumed_from,
                 "completed": result.completed,
             }
+        elif args.command == "sync-many":
+            service = create_sync_service(args.database)
+            results = [
+                asyncio.run(
+                    service.run(
+                        SyncRequest(
+                            connector_id=args.connector,
+                            dataset=dataset,
+                            connector_config=_merge_values(
+                                args.config, args.set_config
+                            ),
+                            restart=args.restart,
+                        )
+                    )
+                )
+                for dataset in args.datasets
+            ]
+            output = [
+                {
+                    "connector": result.connector_id,
+                    "dataset": result.dataset,
+                    "records_written": result.records_written,
+                    "pages_processed": result.pages_processed,
+                    "resumed_from": result.resumed_from,
+                    "completed": result.completed,
+                }
+                for result in results
+            ]
         elif args.command == "link":
             output = create_entity_resolution_service(args.database).run()
         else:

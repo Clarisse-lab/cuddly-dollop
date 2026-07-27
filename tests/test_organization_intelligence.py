@@ -72,6 +72,26 @@ class OrganizationIntelligenceServiceTests(unittest.TestCase):
                         "dt_emissao_op": "2025-08-28T00:00:00",
                     },
                 ),
+                (
+                    "transparencia",
+                    "cnep",
+                    "sanction-1",
+                    {
+                        "id": 901,
+                        "sancionado": {
+                            "codigoFormatado": cnpj,
+                            "nome": "FUNDO MUNICIPAL DE SAUDE",
+                        },
+                        "tipoSancao": {
+                            "descricaoResumida": "Multa",
+                            "descricaoPortal": "Multa administrativa",
+                        },
+                        "orgaoSancionador": {"nome": "Órgão de Controle"},
+                        "numeroProcesso": "0001/2026",
+                        "valorMulta": "25.000,00",
+                        "dataPublicacaoSancao": "20/07/2026",
+                    },
+                ),
             )
             for connector_id, dataset, external_id, data in records:
                 repository.commit_page(
@@ -99,12 +119,14 @@ class OrganizationIntelligenceServiceTests(unittest.TestCase):
             self.assertEqual(overview.counts["payment_orders"], 1)
             self.assertEqual(overview.counts["paid_orders"], 1)
             self.assertEqual(overview.counts["opportunities"], 1)
+            self.assertEqual(overview.counts["cnep"], 1)
+            self.assertEqual(overview.counts["integrity_occurrences"], 1)
             self.assertEqual(overview.totals["amendments"], 200000)
             self.assertEqual(overview.totals["payment_orders"], 100000)
             self.assertEqual(overview.totals["opportunities"], 150000)
             self.assertEqual(
                 {activity.category for activity in overview.activities},
-                {"amendments", "payments", "opportunities"},
+                {"amendments", "payments", "opportunities", "integrity"},
             )
             amendment = next(
                 activity
@@ -113,6 +135,13 @@ class OrganizationIntelligenceServiceTests(unittest.TestCase):
             )
             self.assertIsNone(amendment.occurred_at)
             self.assertEqual(amendment.occurred_year, 2026)
+            integrity = next(
+                activity
+                for activity in overview.activities
+                if activity.category == "integrity"
+            )
+            self.assertEqual(integrity.amount, 25000)
+            self.assertEqual(integrity.occurred_at, datetime(2026, 7, 20, tzinfo=UTC))
 
     def test_returns_none_for_unknown_organization(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

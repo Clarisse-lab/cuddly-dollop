@@ -110,6 +110,64 @@ class PortalTransparenciaConnectorTests(unittest.TestCase):
         self.assertIn("nomeAutor=Maria+da+Silva", url)
         self.assertIn("codigoUF=35", url)
 
+    def test_fetches_sanction_datasets_with_stable_ids_and_public_source(self) -> None:
+        examples = {
+            "ceis": {
+                "id": 101,
+                "sancionado": {
+                    "nome": "Empresa CEIS",
+                    "codigoFormatado": "11.222.333/0001-44",
+                },
+            },
+            "cnep": {
+                "id": 202,
+                "sancionado": {
+                    "nome": "Empresa CNEP",
+                    "codigoFormatado": "11.222.333/0001-44",
+                },
+            },
+            "cepim": {
+                "id": 303,
+                "pessoaJuridica": {
+                    "nome": "Entidade CEPIM",
+                    "cnpjFormatado": "11.222.333/0001-44",
+                },
+            },
+        }
+
+        for dataset, item in examples.items():
+            with self.subTest(dataset=dataset):
+                http = FakeHttp([item])
+                page = asyncio.run(
+                    self.connector().fetch_page(dataset, {}, None, http)
+                )
+
+                self.assertEqual(page.records[0].external_id, str(item["id"]))
+                self.assertIn(f"/api-de-dados/{dataset}", http.calls[0][0])
+                self.assertEqual(
+                    page.records[0].source_url,
+                    "https://portaldatransparencia.gov.br/sancoes/consulta"
+                    "?cpfCnpj=11222333000144",
+                )
+
+    def test_preserves_official_sanction_filters(self) -> None:
+        http = FakeHttp([])
+
+        asyncio.run(
+            self.connector().fetch_page(
+                "ceis",
+                {
+                    "codigoSancionado": "11222333000144",
+                    "dataInicialSancao": "01/01/2026",
+                },
+                None,
+                http,
+            )
+        )
+
+        self.assertIn("codigoSancionado=11222333000144", http.calls[0][0])
+        self.assertIn("dataInicialSancao=01%2F01%2F2026", http.calls[0][0])
+
     def test_rejects_amendment_without_stable_identifier(self) -> None:
         with self.assertRaisesRegex(InvalidResponseError, "codigoEmenda"):
             asyncio.run(

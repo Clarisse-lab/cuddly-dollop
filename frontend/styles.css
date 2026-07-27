@@ -236,7 +236,7 @@ footer a { color: var(--forest-2); font-weight: 700; text-decoration: none; }
 }
 .organization-metrics {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
   margin-top: 25px;
 }

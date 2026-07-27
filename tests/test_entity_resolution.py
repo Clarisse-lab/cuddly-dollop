@@ -10,6 +10,8 @@ from govdata.application.entity_resolution import (
     EntityResolutionService,
     _cnpj,
     _pncp_open_opportunities,
+    _transparency_ceis_cnep,
+    _transparency_cepim,
     _transferegov_amendment_beneficiaries,
     _transferegov_payment_documents,
 )
@@ -125,6 +127,49 @@ class TransferegovExtractorTests(unittest.TestCase):
             ),
             (),
         )
+
+
+class TransparencySanctionExtractorTests(unittest.TestCase):
+    def test_extracts_ceis_and_cnep_sanctioned_organization(self) -> None:
+        references = _transparency_ceis_cnep(
+            {
+                "sancionado": {
+                    "codigoFormatado": "11.222.333/0001-44",
+                    "nome": "Empresa Sancionada",
+                }
+            }
+        )
+
+        self.assertEqual(len(references), 1)
+        self.assertEqual(references[0].entity_id, "11222333000144")
+        self.assertEqual(references[0].display_name, "Empresa Sancionada")
+        self.assertEqual(references[0].role, "sanctioned")
+
+    def test_extracts_cepim_impeded_organization(self) -> None:
+        references = _transparency_cepim(
+            {
+                "pessoaJuridica": {
+                    "cnpjFormatado": "11.222.333/0001-44",
+                    "razaoSocialReceita": "Entidade Impedida",
+                }
+            }
+        )
+
+        self.assertEqual(len(references), 1)
+        self.assertEqual(references[0].entity_id, "11222333000144")
+        self.assertEqual(references[0].display_name, "Entidade Impedida")
+
+    def test_ignores_personal_identifiers_in_sanction_data(self) -> None:
+        references = _transparency_ceis_cnep(
+            {
+                "sancionado": {
+                    "codigoFormatado": "123.456.789-00",
+                    "nome": "Pessoa Física",
+                }
+            }
+        )
+
+        self.assertEqual(references, ())
 
 
 class EntityResolutionServiceTests(unittest.TestCase):

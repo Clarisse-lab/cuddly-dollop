@@ -36,6 +36,12 @@ class OrganizationIntelligenceService:
                 and str(record.data.get("in_situacao_op", "")).casefold() == "paga"
             ),
             "opportunities": self._count(records, "open-opportunities"),
+            "ceis": self._count(records, "ceis"),
+            "cnep": self._count(records, "cnep"),
+            "cepim": self._count(records, "cepim"),
+            "integrity_occurrences": sum(
+                1 for record in records if record.dataset in {"ceis", "cnep", "cepim"}
+            ),
         }
         totals = {
             "amendments": self._sum(records, "amendment-beneficiaries", "vl_total_emenda"),
@@ -124,6 +130,83 @@ class OrganizationIntelligenceService:
                 status=cls._text(data.get("in_situacao_op")),
                 source_url=record.source_url,
             )
+        if record.dataset in {"ceis", "cnep"}:
+            sanction_type = data.get("tipoSancao")
+            sanctioning_body = data.get("orgaoSancionador")
+            type_name = (
+                cls._text(
+                    sanction_type.get("descricaoPortal")
+                    or sanction_type.get("descricaoResumida")
+                )
+                if isinstance(sanction_type, Mapping)
+                else None
+            )
+            body_name = (
+                cls._text(sanctioning_body.get("nome"))
+                if isinstance(sanctioning_body, Mapping)
+                else None
+            )
+            description = " · ".join(
+                filter(
+                    None,
+                    (
+                        body_name,
+                        cls._text(data.get("numeroProcesso")),
+                        cls._text(data.get("informacoesAdicionaisDoOrgaoSancionador")),
+                    ),
+                )
+            )
+            return OrganizationActivity(
+                category="integrity",
+                dataset=record.dataset,
+                external_id=record.external_id,
+                title=f"{record.dataset.upper()} — {type_name or 'Sanção registrada'}",
+                description=description or None,
+                amount=cls._number(data.get("valorMulta")),
+                occurred_at=cls._datetime(
+                    data.get("dataPublicacaoSancao")
+                    or data.get("dataInicioSancao")
+                    or data.get("dataReferencia")
+                ),
+                occurred_year=None,
+                status=type_name,
+                source_url=record.source_url,
+            )
+        if record.dataset == "cepim":
+            agreement = data.get("convenio")
+            superior_body = data.get("orgaoSuperior")
+            agreement_number = (
+                cls._text(agreement.get("numero"))
+                if isinstance(agreement, Mapping)
+                else None
+            )
+            body_name = (
+                cls._text(superior_body.get("nome"))
+                if isinstance(superior_body, Mapping)
+                else None
+            )
+            description = " · ".join(
+                filter(
+                    None,
+                    (
+                        cls._text(data.get("motivo")),
+                        f"Convênio {agreement_number}" if agreement_number else None,
+                        body_name,
+                    ),
+                )
+            )
+            return OrganizationActivity(
+                category="integrity",
+                dataset=record.dataset,
+                external_id=record.external_id,
+                title="CEPIM — Entidade impedida",
+                description=description or None,
+                amount=None,
+                occurred_at=cls._datetime(data.get("dataReferencia")),
+                occurred_year=None,
+                status="Impedimento",
+                source_url=record.source_url,
+            )
         organization = data.get("orgaoEntidade")
         unit = data.get("unidadeOrgao")
         organization_name = (
@@ -192,8 +275,14 @@ class OrganizationIntelligenceService:
     def _datetime(value: Any) -> datetime | None:
         if not isinstance(value, str) or not value.strip():
             return None
+        text = value.strip()
+        for date_format in ("%d/%m/%Y", "%d/%m/%Y %H:%M:%S"):
+            try:
+                return datetime.strptime(text, date_format).replace(tzinfo=UTC)
+            except ValueError:
+                pass
         try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
         except ValueError:
             return None
         return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)

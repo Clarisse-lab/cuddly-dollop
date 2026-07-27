@@ -32,6 +32,18 @@ DATASETS = {
         path="/api-de-dados/emendas",
         id_field="codigoEmenda",
     ),
+    "ceis": DatasetDefinition(
+        path="/api-de-dados/ceis",
+        id_field="id",
+    ),
+    "cnep": DatasetDefinition(
+        path="/api-de-dados/cnep",
+        id_field="id",
+    ),
+    "cepim": DatasetDefinition(
+        path="/api-de-dados/cepim",
+        id_field="id",
+    ),
 }
 
 
@@ -62,7 +74,7 @@ class PortalTransparenciaConnector(PublicDataConnector):
             )
         self._base_url = base_url.rstrip("/")
 
-        requests_per_minute = self.config.get("requests_per_minute", 180)
+        requests_per_minute = self.config.get("requests_per_minute", 80)
         if (
             isinstance(requests_per_minute, bool)
             or not isinstance(requests_per_minute, (int, float))
@@ -127,7 +139,26 @@ class PortalTransparenciaConnector(PublicDataConnector):
                     "https://portaldatransparencia.gov.br/emendas/detalhe"
                     f"?codigoEmenda={quote(str(code), safe='')}"
                 )
+        if dataset in {"ceis", "cnep", "cepim"}:
+            cnpj = PortalTransparenciaConnector._sanctioned_cnpj(dataset, item)
+            if cnpj:
+                return (
+                    "https://portaldatransparencia.gov.br/sancoes/consulta?"
+                    f"{urlencode({'cpfCnpj': cnpj})}"
+                )
         return fallback
+
+    @staticmethod
+    def _sanctioned_cnpj(dataset: str, item: Mapping[str, Any]) -> str | None:
+        container_name = "pessoaJuridica" if dataset == "cepim" else "sancionado"
+        container = item.get(container_name)
+        if not isinstance(container, Mapping):
+            return None
+        field = "cnpjFormatado" if dataset == "cepim" else "codigoFormatado"
+        digits = "".join(
+            character for character in str(container.get(field, "")) if character.isdigit()
+        )
+        return digits if len(digits) == 14 else None
 
     async def _respect_rate_limit(self) -> None:
         if self._last_request_at is None:

@@ -26,6 +26,9 @@ A chave não deve ser colocada em arquivos versionados nem passada por argumento
 - `orgaos-siafi`: órgãos cadastrados no SIAFI, paginados pelo parâmetro oficial `pagina`.
 - `emendas`: emendas parlamentares do ano corrente, com filtros opcionais de autor,
   função, UF e município. Para uma carga histórica, informe `--param ano=2024`.
+- `ceis`: Cadastro Nacional de Empresas Inidôneas e Suspensas.
+- `cnep`: Cadastro Nacional de Empresas Punidas.
+- `cepim`: Entidades Privadas sem Fins Lucrativos Impedidas.
 
 Exemplos:
 
@@ -34,6 +37,7 @@ govdata sync transparencia emendas
 govdata sync transparencia emendas --param ano=2024
 govdata sync transparencia emendas --param ano=2025 --param nomeAutor="Nome do autor"
 govdata records transparencia emendas --limit 10
+govdata sync-many transparencia ceis cnep cepim
 ```
 
 O catálogo `DATASETS` em `connector.py` permite acrescentar novos endpoints mantendo a
