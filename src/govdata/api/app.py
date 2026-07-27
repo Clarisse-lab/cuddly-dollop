@@ -193,6 +193,7 @@ def create_app(
                     description=item.description,
                     amount=item.amount,
                     occurred_at=item.occurred_at,
+                    occurred_year=item.occurred_year,
                     status=item.status,
                     source_url=item.source_url,
                 )

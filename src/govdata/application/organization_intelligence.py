@@ -21,7 +21,7 @@ class OrganizationIntelligenceService:
         activities = tuple(
             sorted(
                 (self._activity(record) for record in records),
-                key=lambda item: item.occurred_at or datetime.min.replace(tzinfo=UTC),
+                key=self._sort_key,
                 reverse=True,
             )
         )
@@ -91,7 +91,8 @@ class OrganizationIntelligenceService:
                 title=f"Emenda {data.get('nr_emenda') or record.external_id}",
                 description=cls._text(data.get("nm_parlamentar")),
                 amount=cls._number(data.get("vl_total_emenda")),
-                occurred_at=cls._year(data.get("aa_emenda")),
+                occurred_at=None,
+                occurred_year=cls._year(data.get("aa_emenda")),
                 status=cls._text(data.get("in_tipo_emenda_parlamentar")),
                 source_url=record.source_url,
             )
@@ -105,6 +106,7 @@ class OrganizationIntelligenceService:
                 description=cls._text(data.get("tx_observacao")),
                 amount=cls._number(data.get("vl_documento_habil")),
                 occurred_at=cls._datetime(data.get("dt_emissao")),
+                occurred_year=None,
                 status=cls._text(data.get("in_situacao_dh")),
                 source_url=record.source_url,
             )
@@ -118,6 +120,7 @@ class OrganizationIntelligenceService:
                 description=cls._text(data.get("tx_observacao_op")),
                 amount=cls._number(data.get("vl_ordem_pagamento")),
                 occurred_at=cls._datetime(data.get("dt_emissao_op")),
+                occurred_year=None,
                 status=cls._text(data.get("in_situacao_op")),
                 source_url=record.source_url,
             )
@@ -151,9 +154,18 @@ class OrganizationIntelligenceService:
             occurred_at=cls._datetime(
                 data.get("dataPublicacaoPncp") or data.get("dataInclusao")
             ),
+            occurred_year=None,
             status=cls._text(data.get("situacaoCompraNome")),
             source_url=record.source_url,
         )
+
+    @staticmethod
+    def _sort_key(activity: OrganizationActivity) -> datetime:
+        if activity.occurred_at is not None:
+            return activity.occurred_at
+        if activity.occurred_year is not None:
+            return datetime(activity.occurred_year, 1, 1, tzinfo=UTC)
+        return datetime.min.replace(tzinfo=UTC)
 
     @staticmethod
     def _text(value: Any) -> str | None:
@@ -187,9 +199,9 @@ class OrganizationIntelligenceService:
         return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
     @staticmethod
-    def _year(value: Any) -> datetime | None:
+    def _year(value: Any) -> int | None:
         try:
             year = int(value)
         except (TypeError, ValueError):
             return None
-        return datetime(year, 1, 1, tzinfo=UTC) if 1900 <= year <= 3000 else None
+        return year if 1900 <= year <= 3000 else None

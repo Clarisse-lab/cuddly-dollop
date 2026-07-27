@@ -62,6 +62,7 @@ class OrganizationActivityResponse(BaseModel):
     description: str | None
     amount: float | None
     occurred_at: datetime | None
+    occurred_year: int | None
     status: str | None
     source_url: str | None
 

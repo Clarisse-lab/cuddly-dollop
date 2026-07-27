@@ -240,7 +240,11 @@ function renderOrganizationActivities() {
     return;
   }
   elements.organizationActivities.innerHTML = records.map((activity) => {
-    const occurredAt = activity.occurred_at ? dateFormat.format(new Date(activity.occurred_at)) : "Data não informada";
+    const occurredAt = activity.occurred_year
+      ? String(activity.occurred_year)
+      : activity.occurred_at
+        ? dateFormat.format(new Date(activity.occurred_at))
+        : "Data não informada";
     const sourceUrl = safeUrl(activity.source_url);
     return `<div class="activity-item">
       <div class="activity-date">${escapeHtml(occurredAt)}</div>

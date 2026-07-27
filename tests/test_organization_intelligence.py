@@ -106,6 +106,13 @@ class OrganizationIntelligenceServiceTests(unittest.TestCase):
                 {activity.category for activity in overview.activities},
                 {"amendments", "payments", "opportunities"},
             )
+            amendment = next(
+                activity
+                for activity in overview.activities
+                if activity.category == "amendments"
+            )
+            self.assertIsNone(amendment.occurred_at)
+            self.assertEqual(amendment.occurred_year, 2026)
 
     def test_returns_none_for_unknown_organization(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
