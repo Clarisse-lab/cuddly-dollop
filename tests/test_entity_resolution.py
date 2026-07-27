@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from govdata.application.entity_resolution import (
     EntityResolutionService,
@@ -212,6 +213,44 @@ class EntityResolutionServiceTests(unittest.TestCase):
             profile = repository.get_entity_profile("organization", "12345678000100")
             assert profile is not None
             self.assertEqual(len(profile.links), 1)
+
+    def test_writes_one_transaction_per_query_page(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "batched.sqlite3"
+            repository = SQLiteRecordRepository(path)
+            collected_at = datetime(2026, 7, 25, tzinfo=UTC)
+            repository.commit_page(
+                "pncp",
+                "open-opportunities",
+                "scope",
+                tuple(
+                    StoredRecord(
+                        connector_id="pncp",
+                        dataset="open-opportunities",
+                        external_id=str(index),
+                        data={
+                            "orgaoEntidade": {
+                                "cnpj": f"12345678000{index:03d}",
+                                "razaoSocial": f"Organization {index}",
+                            }
+                        },
+                        collected_at=collected_at,
+                    )
+                    for index in range(1, 4)
+                ),
+                None,
+            )
+
+            with patch.object(
+                repository,
+                "record_entity_links_batch",
+                wraps=repository.record_entity_links_batch,
+            ) as batch_write:
+                summary = EntityResolutionService(repository).run(batch_size=10)
+
+            self.assertEqual(summary["records_processed"], 3)
+            self.assertEqual(summary["links_written"], 3)
+            self.assertEqual(batch_write.call_count, 1)
 
     def test_returns_none_for_unknown_entity(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

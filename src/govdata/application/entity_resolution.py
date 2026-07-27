@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from govdata.core.entities import EntityReference
+from govdata.core.entities import EntityRecordReferences, EntityReference
 from govdata.core.ports import DataRepository
 
 ExtractorFn = Callable[[Mapping[str, Any]], tuple[EntityReference, ...]]
@@ -102,14 +102,25 @@ class EntityResolutionService:
                 )
                 if not page.records:
                     break
+                batch: list[EntityRecordReferences] = []
                 for record in page.records:
                     refs = extractor(record.data)
                     if refs:
-                        self._repository.record_entity_links(
-                            connector_id, dataset, record.external_id, refs, observed_at
+                        batch.append(
+                            EntityRecordReferences(
+                                external_id=record.external_id,
+                                references=refs,
+                            )
                         )
                         links_written += len(refs)
                     records_processed += 1
+                if batch:
+                    self._repository.record_entity_links_batch(
+                        connector_id,
+                        dataset,
+                        tuple(batch),
+                        observed_at,
+                    )
                 offset += len(page.records)
                 if offset >= page.total:
                     break

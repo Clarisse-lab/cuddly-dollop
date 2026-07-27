@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Mapping, Protocol
 
-from govdata.core.entities import EntityProfile, EntityReference
+from govdata.core.entities import (
+    EntityProfile,
+    EntityRecordReferences,
+    EntityReference,
+)
 from govdata.core.models import ConnectorPage, ConnectorSpec, RecordPage, StoredRecord
 
 
@@ -94,6 +98,14 @@ class EntityRepository(Protocol):
         dataset: str,
         external_id: str,
         refs: tuple[EntityReference, ...],
+        observed_at: datetime,
+    ) -> None: ...
+
+    def record_entity_links_batch(
+        self,
+        connector_id: str,
+        dataset: str,
+        records: tuple[EntityRecordReferences, ...],
         observed_at: datetime,
     ) -> None: ...
 

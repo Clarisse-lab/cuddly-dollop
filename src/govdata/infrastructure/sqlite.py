@@ -7,7 +7,13 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
-from govdata.core.entities import Entity, EntityLink, EntityProfile, EntityReference
+from govdata.core.entities import (
+    Entity,
+    EntityLink,
+    EntityProfile,
+    EntityRecordReferences,
+    EntityReference,
+)
 from govdata.core.models import RecordPage, StoredRecord
 from govdata.infrastructure.migrations import load_migrations
 
@@ -226,46 +232,71 @@ class SQLiteRecordRepository:
         refs: tuple[EntityReference, ...],
         observed_at: datetime,
     ) -> None:
+        self.record_entity_links_batch(
+            connector_id,
+            dataset,
+            (EntityRecordReferences(external_id, refs),),
+            observed_at,
+        )
+
+    def record_entity_links_batch(
+        self,
+        connector_id: str,
+        dataset: str,
+        records: tuple[EntityRecordReferences, ...],
+        observed_at: datetime,
+    ) -> None:
+        entity_rows = [
+            (
+                ref.entity_type,
+                ref.entity_id,
+                ref.display_name,
+                observed_at.isoformat(),
+                observed_at.isoformat(),
+            )
+            for record in records
+            for ref in record.references
+        ]
+        link_rows = [
+            (
+                ref.entity_type,
+                ref.entity_id,
+                connector_id,
+                dataset,
+                record.external_id,
+                ref.role,
+                observed_at.isoformat(),
+            )
+            for record in records
+            for ref in record.references
+        ]
+        if not entity_rows:
+            return
         with self._connect() as connection:
-            for ref in refs:
-                connection.execute(
-                    """
-                    INSERT INTO entities (
-                        entity_type, entity_id, display_name, first_seen_at, last_seen_at
-                    ) VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT(entity_type, entity_id) DO UPDATE SET
-                        display_name = COALESCE(excluded.display_name, entities.display_name),
-                        last_seen_at = excluded.last_seen_at
-                    """,
-                    (
-                        ref.entity_type,
-                        ref.entity_id,
-                        ref.display_name,
-                        observed_at.isoformat(),
-                        observed_at.isoformat(),
-                    ),
-                )
-                connection.execute(
-                    """
-                    INSERT INTO entity_links (
-                        entity_type, entity_id, connector_id, dataset, external_id,
-                        role, linked_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(entity_type, entity_id, connector_id, dataset, external_id)
-                    DO UPDATE SET
-                        role = excluded.role,
-                        linked_at = excluded.linked_at
-                    """,
-                    (
-                        ref.entity_type,
-                        ref.entity_id,
-                        connector_id,
-                        dataset,
-                        external_id,
-                        ref.role,
-                        observed_at.isoformat(),
-                    ),
-                )
+            connection.executemany(
+                """
+                INSERT INTO entities (
+                    entity_type, entity_id, display_name, first_seen_at, last_seen_at
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+                    display_name = COALESCE(excluded.display_name, entities.display_name),
+                    last_seen_at = excluded.last_seen_at
+                """,
+                entity_rows,
+            )
+            connection.executemany(
+                """
+                INSERT INTO entity_links (
+                    entity_type, entity_id, connector_id, dataset, external_id,
+                    role, linked_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(entity_type, entity_id, connector_id, dataset, external_id)
+                DO UPDATE SET
+                    role = excluded.role,
+                    linked_at = excluded.linked_at
+                """,
+                link_rows,
+            )
 
     def get_entity_profile(self, entity_type: str, entity_id: str) -> EntityProfile | None:
         with self._connect() as connection:

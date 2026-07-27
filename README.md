@@ -338,6 +338,10 @@ O comando varre os datasets com regras de extração conhecidas
 (`src/govdata/application/entity_resolution.py`) e grava vínculos idempotentes; rodar
 várias vezes não duplica nada.
 
+As gravações são agrupadas por página em uma única transação. A varredura continua
+completa para preservar a mesma cobertura dos dados, mas evita abrir uma conexão e
+uma transação para cada registro individual.
+
 **Escopo desta primeira versão, de propósito:**
 
 - Liga `pncp/open-opportunities`, `transferegov/amendment-beneficiaries` e
