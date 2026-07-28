@@ -9,6 +9,7 @@ from unittest.mock import patch
 from govdata.application.entity_resolution import (
     EntityResolutionService,
     _cnpj,
+    _pncp_contracts,
     _pncp_open_opportunities,
     _transparency_ceis_cnep,
     _transparency_cepim,
@@ -61,6 +62,46 @@ class PNCPExtractorTests(unittest.TestCase):
         )
 
         self.assertIn(EntityReference("location", "SP", role="buyer-location"), refs)
+
+    def test_extracts_buyer_supplier_and_subcontractor_from_contract(self) -> None:
+        refs = _pncp_contracts(
+            {
+                "orgaoEntidade": {
+                    "cnpj": "12345678000100",
+                    "razaoSocial": "Prefeitura",
+                },
+                "niFornecedor": "00.987.654/0001-99",
+                "nomeRazaoSocialFornecedor": "Fornecedor Principal",
+                "niFornecedorSubContratado": "11.222.333/0001-44",
+                "nomeFornecedorSubContratado": "Subcontratada",
+                "unidadeOrgao": {"ufSigla": "SP"},
+            }
+        )
+
+        self.assertIn(
+            EntityReference(
+                "organization",
+                "00987654000199",
+                "Fornecedor Principal",
+                role="supplier",
+            ),
+            refs,
+        )
+        self.assertIn(
+            EntityReference(
+                "organization",
+                "11222333000144",
+                "Subcontratada",
+                role="subcontractor",
+            ),
+            refs,
+        )
+        self.assertIn(
+            EntityReference(
+                "organization", "12345678000100", "Prefeitura", role="buyer"
+            ),
+            refs,
+        )
 
 
 class TransferegovExtractorTests(unittest.TestCase):

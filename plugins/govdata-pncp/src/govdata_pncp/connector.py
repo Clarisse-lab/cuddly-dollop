@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from time import monotonic
 from typing import Any, Mapping
 from urllib.parse import urlencode
@@ -21,12 +21,12 @@ TRANSIENT_STATUSES = {429, 500, 502, 503, 504}
 
 
 class PNCPConnector(PublicDataConnector):
-    """Open procurement opportunities from Brazil's official PNCP API."""
+    """Procurement opportunities and contracts from Brazil's official PNCP API."""
 
     spec = ConnectorSpec(
         id="pncp",
         display_name="Portal Nacional de Contratações Públicas",
-        datasets=("open-opportunities",),
+        datasets=("open-opportunities", "contracts"),
         source_url="https://pncp.gov.br",
     )
 
@@ -80,7 +80,7 @@ class PNCPConnector(PublicDataConnector):
         cursor: str | None,
         http: HttpClient,
     ) -> ConnectorPage:
-        if dataset != "open-opportunities":
+        if dataset not in self.spec.datasets:
             raise InvalidResponseError(f"unexpected dataset: {dataset}")
 
         page_number = self._page_number(cursor)
@@ -89,15 +89,32 @@ class PNCPConnector(PublicDataConnector):
             for key, value in parameters.items()
             if key not in {"pagina", "tamanhoPagina"}
         }
-        data_final = str(query.get("dataFinal") or datetime.now(UTC).strftime("%Y%m%d"))
-        if len(data_final) != 8 or not data_final.isdigit():
-            raise ConnectorConfigurationError(
-                "pncp parameter 'dataFinal' must use YYYYMMDD"
-            )
+        now = datetime.now(UTC)
+        default_date = (
+            (now - timedelta(days=1)).strftime("%Y%m%d")
+            if dataset == "contracts"
+            else now.strftime("%Y%m%d")
+        )
+        data_final = self._date_parameter(
+            query.get("dataFinal"),
+            default=default_date,
+            name="dataFinal",
+        )
         query["dataFinal"] = data_final
+        if dataset == "contracts":
+            query["dataInicial"] = self._date_parameter(
+                query.get("dataInicial"),
+                default=default_date,
+                name="dataInicial",
+            )
         query["pagina"] = page_number
         query["tamanhoPagina"] = self._page_size
-        url = f"{self._base_url}/v1/contratacoes/proposta?{urlencode(query, doseq=True)}"
+        endpoint = (
+            "/v1/contratacoes/proposta"
+            if dataset == "open-opportunities"
+            else "/v1/contratos/atualizacao"
+        )
+        url = f"{self._base_url}{endpoint}?{urlencode(query, doseq=True)}"
 
         response = await self._get_with_retries(http, url)
         self._raise_for_status(response)
@@ -109,18 +126,22 @@ class PNCPConnector(PublicDataConnector):
         records: list[ConnectorRecord] = []
         for item in items:
             if not isinstance(item, dict):
-                raise InvalidResponseError("PNCP opportunity must be an object")
+                raise InvalidResponseError(f"PNCP {dataset} item must be an object")
             external_id = item.get("numeroControlePNCP")
             if not isinstance(external_id, str) or not external_id:
                 raise InvalidResponseError(
-                    "PNCP opportunity is missing 'numeroControlePNCP'"
+                    f"PNCP {dataset} item is missing 'numeroControlePNCP'"
                 )
             records.append(
                 ConnectorRecord(
                     external_id=external_id,
                     data=item,
                     source_updated_at=self._source_updated_at(item),
-                    source_url=self._opportunity_url(item, url),
+                    source_url=(
+                        self._opportunity_url(item, url)
+                        if dataset == "open-opportunities"
+                        else self._contract_url(item, url)
+                    ),
                 )
             )
 
@@ -139,6 +160,15 @@ class PNCPConnector(PublicDataConnector):
             else None
         )
         return ConnectorPage(records=tuple(records), next_cursor=next_cursor)
+
+    @staticmethod
+    def _date_parameter(value: Any, *, default: str, name: str) -> str:
+        text = str(value or default)
+        if len(text) != 8 or not text.isdigit():
+            raise ConnectorConfigurationError(
+                f"pncp parameter '{name}' must use YYYYMMDD"
+            )
+        return text
 
     async def _get_with_retries(self, http: HttpClient, url: str) -> HttpResponse:
         for attempt in range(self._rate_limit_retries + 1):
@@ -214,6 +244,16 @@ class PNCPConnector(PublicDataConnector):
         sequence = item.get("sequencialCompra")
         if cnpj and year is not None and sequence is not None:
             return f"https://pncp.gov.br/app/editais/{cnpj}/{year}/{sequence}"
+        return fallback
+
+    @staticmethod
+    def _contract_url(item: Mapping[str, Any], fallback: str) -> str:
+        organization = item.get("orgaoEntidade")
+        cnpj = organization.get("cnpj") if isinstance(organization, dict) else None
+        year = item.get("anoContrato")
+        sequence = item.get("sequencialContrato")
+        if cnpj and year is not None and sequence is not None:
+            return f"https://pncp.gov.br/app/contratos/{cnpj}/{year}/{sequence}"
         return fallback
 
     @staticmethod

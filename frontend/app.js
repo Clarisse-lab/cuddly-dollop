@@ -220,6 +220,7 @@ function renderOrganization() {
     ),
     metricCard("Documentos de pagamento", overview.counts.payment_documents, overview.totals.payment_documents),
     metricCard("Licitações", overview.counts.opportunities, overview.totals.opportunities),
+    metricCard("Contratos", overview.counts.contracts, overview.totals.contracts),
     metricCard(
       "Sanções e impedimentos",
       overview.counts.integrity_occurrences,
@@ -270,6 +271,13 @@ function renderOrganizationActivities() {
     </div>`;
   }).join("");
 }
+function defaultOrganizationCategory(overview) {
+  if (overview.counts.amendments) return "amendments";
+  if (overview.counts.payment_documents || overview.counts.payment_orders) return "payments";
+  if (overview.counts.opportunities) return "opportunities";
+  if (overview.counts.contracts) return "contracts";
+  return "integrity";
+}
 async function searchOrganization(event) {
   event.preventDefault();
   const cnpj = elements.organizationCnpjInput.value.replace(/\D/g, "");
@@ -282,7 +290,7 @@ async function searchOrganization(event) {
   elements.organizationSearchButton.textContent = "Buscando...";
   try {
     state.organizationOverview = await fetchJson(`/api/v1/organizations/${cnpj}/overview`);
-    state.organizationCategory = "amendments";
+    state.organizationCategory = defaultOrganizationCategory(state.organizationOverview);
     renderOrganization();
     elements.organizationResult.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {

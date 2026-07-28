@@ -36,6 +36,7 @@ class OrganizationIntelligenceService:
                 and str(record.data.get("in_situacao_op", "")).casefold() == "paga"
             ),
             "opportunities": self._count(records, "open-opportunities"),
+            "contracts": self._count(records, "contracts"),
             "ceis": self._count(records, "ceis"),
             "cnep": self._count(records, "cnep"),
             "cepim": self._count(records, "cepim"),
@@ -54,6 +55,7 @@ class OrganizationIntelligenceService:
             "opportunities": self._sum(
                 records, "open-opportunities", "valorTotalEstimado"
             ),
+            "contracts": self._sum(records, "contracts", "valorGlobal"),
         }
         sources = tuple(
             sorted({f"{record.connector_id}/{record.dataset}" for record in records})
@@ -207,6 +209,48 @@ class OrganizationIntelligenceService:
                 status="Impedimento",
                 source_url=record.source_url,
             )
+        if record.dataset == "contracts":
+            organization = data.get("orgaoEntidade")
+            unit = data.get("unidadeOrgao")
+            organization_name = (
+                cls._text(
+                    organization.get("razaoSocial") or organization.get("razaosocial")
+                )
+                if isinstance(organization, Mapping)
+                else None
+            )
+            supplier_name = cls._text(data.get("nomeRazaoSocialFornecedor"))
+            location = (
+                " / ".join(
+                    filter(
+                        None,
+                        (
+                            cls._text(unit.get("municipioNome")),
+                            cls._text(unit.get("ufSigla")),
+                        ),
+                    )
+                )
+                if isinstance(unit, Mapping)
+                else ""
+            )
+            return OrganizationActivity(
+                category="contracts",
+                dataset=record.dataset,
+                external_id=record.external_id,
+                title=cls._text(data.get("objetoContrato"))
+                or f"Contrato {data.get('numeroContratoEmpenho') or record.external_id}",
+                description=" · ".join(
+                    filter(None, (organization_name, supplier_name, location))
+                )
+                or None,
+                amount=cls._number(data.get("valorGlobal")),
+                occurred_at=cls._datetime(
+                    data.get("dataAssinatura") or data.get("dataPublicacaoPncp")
+                ),
+                occurred_year=None,
+                status=cls._nested_text(data.get("tipoContrato"), "nome"),
+                source_url=record.source_url,
+            )
         organization = data.get("orgaoEntidade")
         unit = data.get("unidadeOrgao")
         organization_name = (
@@ -254,6 +298,10 @@ class OrganizationIntelligenceService:
     def _text(value: Any) -> str | None:
         text = str(value).strip() if value is not None else ""
         return text or None
+
+    @classmethod
+    def _nested_text(cls, value: Any, field: str) -> str | None:
+        return cls._text(value.get(field)) if isinstance(value, Mapping) else None
 
     @staticmethod
     def _number(value: Any) -> float | None:

@@ -97,12 +97,76 @@ class PNCPConnectorTests(unittest.TestCase):
         self.assertEqual(page.records, ())
         self.assertIsNone(page.next_cursor)
 
+    def test_fetches_and_maps_contracts(self) -> None:
+        payload = {
+            "data": [
+                {
+                    "numeroControlePNCP": "12345678000100-2-000007/2026",
+                    "sequencialContrato": 7,
+                    "anoContrato": 2026,
+                    "dataAtualizacao": "2026-07-27T18:06:39",
+                    "orgaoEntidade": {"cnpj": "12345678000100"},
+                    "niFornecedor": "00987654000199",
+                    "objetoContrato": "Serviços de manutenção",
+                    "valorGlobal": 250000,
+                }
+            ],
+            "totalPaginas": 1,
+            "numeroPagina": 1,
+        }
+        http = FakeHttpClient(payload)
+
+        page = asyncio.run(
+            PNCPConnector().fetch_page(
+                "contracts",
+                {"dataInicial": "20260701", "dataFinal": "20260727"},
+                None,
+                http,
+            )
+        )
+
+        self.assertEqual(page.records[0].external_id, "12345678000100-2-000007/2026")
+        self.assertEqual(
+            page.records[0].source_url,
+            "https://pncp.gov.br/app/contratos/12345678000100/2026/7",
+        )
+        self.assertEqual(
+            page.records[0].source_updated_at,
+            datetime(2026, 7, 27, 18, 6, 39, tzinfo=UTC),
+        )
+        self.assertIn("/v1/contratos/atualizacao?", http.urls[0])
+        self.assertIn("dataInicial=20260701", http.urls[0])
+        self.assertIn("dataFinal=20260727", http.urls[0])
+
+    def test_contracts_default_to_previous_utc_day(self) -> None:
+        http = FakeHttpClient(
+            {"data": [], "totalPaginas": 1, "numeroPagina": 1}
+        )
+
+        with patch("govdata_pncp.connector.datetime") as mocked_datetime:
+            mocked_datetime.now.return_value = datetime(2026, 7, 28, 2, tzinfo=UTC)
+            asyncio.run(PNCPConnector().fetch_page("contracts", {}, None, http))
+
+        self.assertIn("dataInicial=20260727", http.urls[0])
+        self.assertIn("dataFinal=20260727", http.urls[0])
+
     def test_rejects_invalid_date(self) -> None:
         with self.assertRaises(ConnectorConfigurationError):
             asyncio.run(
                 PNCPConnector().fetch_page(
                     "open-opportunities",
                     {"dataFinal": "22/07/2026"},
+                    None,
+                    FakeHttpClient({}),
+                )
+            )
+
+    def test_rejects_invalid_contract_initial_date(self) -> None:
+        with self.assertRaises(ConnectorConfigurationError):
+            asyncio.run(
+                PNCPConnector().fetch_page(
+                    "contracts",
+                    {"dataInicial": "01/07/2026", "dataFinal": "20260722"},
                     None,
                     FakeHttpClient({}),
                 )

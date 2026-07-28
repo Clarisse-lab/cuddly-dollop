@@ -35,6 +35,31 @@ class OrganizationIntelligenceServiceTests(unittest.TestCase):
                     },
                 ),
                 (
+                    "pncp",
+                    "contracts",
+                    "contract-1",
+                    {
+                        "numeroControlePNCP": "99999999000199-2-000001/2026",
+                        "numeroContratoEmpenho": "15/2026",
+                        "anoContrato": 2026,
+                        "sequencialContrato": 1,
+                        "orgaoEntidade": {
+                            "cnpj": "99999999000199",
+                            "razaoSocial": "PREFEITURA CONTRATANTE",
+                        },
+                        "unidadeOrgao": {
+                            "municipioNome": "Teresina",
+                            "ufSigla": "PI",
+                        },
+                        "niFornecedor": cnpj,
+                        "nomeRazaoSocialFornecedor": "FUNDO MUNICIPAL DE SAUDE",
+                        "objetoContrato": "Manutenção de equipamentos",
+                        "valorGlobal": 175000,
+                        "dataAssinatura": "2026-07-23",
+                        "tipoContrato": {"nome": "Contrato"},
+                    },
+                ),
+                (
                     "transferegov",
                     "amendment-beneficiaries",
                     "beneficiary-1",
@@ -119,14 +144,16 @@ class OrganizationIntelligenceServiceTests(unittest.TestCase):
             self.assertEqual(overview.counts["payment_orders"], 1)
             self.assertEqual(overview.counts["paid_orders"], 1)
             self.assertEqual(overview.counts["opportunities"], 1)
+            self.assertEqual(overview.counts["contracts"], 1)
             self.assertEqual(overview.counts["cnep"], 1)
             self.assertEqual(overview.counts["integrity_occurrences"], 1)
             self.assertEqual(overview.totals["amendments"], 200000)
             self.assertEqual(overview.totals["payment_orders"], 100000)
             self.assertEqual(overview.totals["opportunities"], 150000)
+            self.assertEqual(overview.totals["contracts"], 175000)
             self.assertEqual(
                 {activity.category for activity in overview.activities},
-                {"amendments", "payments", "opportunities", "integrity"},
+                {"amendments", "payments", "opportunities", "contracts", "integrity"},
             )
             amendment = next(
                 activity

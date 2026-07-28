@@ -202,6 +202,15 @@ PNCP não exige chave. O conector limita a paginação a 12 requisições por mi
 aguarda automaticamente quando o serviço responde com HTTP 429 ou falhas temporárias
 HTTP 500, 502, 503 e 504.
 
+Para contratos e empenhos do PNCP, crie outro worker usando
+`/railway.pncp-contracts-worker.toml`. Ele executa `govdata sync pncp contracts`
+diariamente às 03:30 UTC e, por padrão, coleta as inclusões e alterações do dia UTC
+anterior. Uma carga histórica pode ser feita por intervalos curtos:
+
+```powershell
+govdata sync pncp contracts --param dataInicial=20260701 --param dataFinal=20260701
+```
+
 Para emendas parlamentares, crie um terceiro worker usando
 `/railway.emendas-worker.toml`. Ele compartilha as mesmas variáveis do worker do Portal:
 
@@ -277,13 +286,15 @@ de linha de comando ou incluída em arquivos versionados.
 
 ## Plugin do PNCP
 
-O plugin em `plugins/govdata-pncp` consulta oportunidades com recebimento de propostas
-aberto no Portal Nacional de Contratações Públicas:
+O plugin em `plugins/govdata-pncp` consulta oportunidades abertas e contratos/empenhos
+no Portal Nacional de Contratações Públicas:
 
 ```powershell
 python -m pip install -e .\plugins\govdata-pncp
 govdata sync pncp open-opportunities
+govdata sync pncp contracts
 govdata records pncp open-opportunities --limit 10
+govdata records pncp contracts --limit 10
 ```
 
 Filtros oficiais do PNCP, como UF, município, CNPJ e modalidade, podem ser enviados
@@ -351,10 +362,12 @@ uma transação para cada registro individual.
 
 **Escopo desta primeira versão, de propósito:**
 
-- Liga `pncp/open-opportunities`, `transferegov/amendment-beneficiaries`,
+- Liga `pncp/open-opportunities`, `pncp/contracts`,
+  `transferegov/amendment-beneficiaries`,
   `transferegov/payment-documents` e os cadastros `transparencia/ceis`,
   `transparencia/cnep` e `transparencia/cepim`, que possuem campos de CNPJ confirmados
-  (`orgaoEntidade.cnpj`, `nr_cnpj_beneficiario_emenda` e `cd_credor_devedor`).
+  (`orgaoEntidade.cnpj`, `niFornecedor`, `nr_cnpj_beneficiario_emenda` e
+  `cd_credor_devedor`).
   O UF de `unidadeOrgao.ufSigla`
   do PNCP é extraído de forma tolerante (best-effort), já que só foi observado no
   frontend, não confirmado nos testes do conector.

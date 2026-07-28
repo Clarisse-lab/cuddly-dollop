@@ -29,9 +29,14 @@ def _pncp_open_opportunities(data: Mapping[str, Any]) -> tuple[EntityReference, 
     if isinstance(organization, dict):
         cnpj = _cnpj(organization.get("cnpj"))
         if cnpj:
+            display_name = (
+                organization.get("razaoSocial")
+                or organization.get("razaosocial")
+                or organization.get("nome")
+            )
             refs.append(
                 EntityReference(
-                    "organization", cnpj, organization.get("razaoSocial"), role="buyer"
+                    "organization", cnpj, display_name, role="buyer"
                 )
             )
     # unidadeOrgao.ufSigla is not covered by the connector's own tests (only observed
@@ -42,6 +47,32 @@ def _pncp_open_opportunities(data: Mapping[str, Any]) -> tuple[EntityReference, 
         uf = _uf(unit.get("ufSigla"))
         if uf:
             refs.append(EntityReference("location", uf, role="buyer-location"))
+    return tuple(refs)
+
+
+def _pncp_contracts(data: Mapping[str, Any]) -> tuple[EntityReference, ...]:
+    refs = list(_pncp_open_opportunities(data))
+    supplier_cnpj = _cnpj(data.get("niFornecedor"))
+    if supplier_cnpj:
+        refs.append(
+            EntityReference(
+                "organization",
+                supplier_cnpj,
+                data.get("nomeRazaoSocialFornecedor"),
+                role="supplier",
+            )
+        )
+    subcontractor_cnpj = _cnpj(data.get("niFornecedorSubContratado"))
+    if subcontractor_cnpj:
+        refs.append(
+            EntityReference(
+                "organization",
+                subcontractor_cnpj,
+                data.get("nomeFornecedorSubContratado")
+                or data.get("nomeRazaoSocialFornecedorSubContratado"),
+                role="subcontractor",
+            )
+        )
     return tuple(refs)
 
 
@@ -128,6 +159,7 @@ def _transparency_cepim(
 
 EXTRACTORS: dict[tuple[str, str], ExtractorFn] = {
     ("pncp", "open-opportunities"): _pncp_open_opportunities,
+    ("pncp", "contracts"): _pncp_contracts,
     ("transferegov", "amendment-beneficiaries"): _transferegov_amendment_beneficiaries,
     ("transferegov", "payment-documents"): _transferegov_payment_documents,
     ("transparencia", "ceis"): _transparency_ceis_cnep,
