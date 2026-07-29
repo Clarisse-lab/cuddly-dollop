@@ -173,7 +173,21 @@ class PNCPConnector(PublicDataConnector):
     async def _get_with_retries(self, http: HttpClient, url: str) -> HttpResponse:
         for attempt in range(self._rate_limit_retries + 1):
             await self._respect_rate_limit()
-            response = await http.get(url, timeout=self._timeout)
+            try:
+                response = await http.get(url, timeout=self._timeout)
+            except TransportError:
+                self._last_request_at = monotonic()
+                if attempt == self._rate_limit_retries:
+                    raise
+                delay = self._backoff_delay(attempt)
+                LOGGER.warning(
+                    "PNCP request failed temporarily; retrying in %.0f seconds (%s/%s)",
+                    delay,
+                    attempt + 1,
+                    self._rate_limit_retries,
+                )
+                await asyncio.sleep(delay)
+                continue
             self._last_request_at = monotonic()
             if (
                 response.status not in TRANSIENT_STATUSES
@@ -213,6 +227,10 @@ class PNCPConnector(PublicDataConnector):
                 return min(max(float(retry_after), 1), 300)
             except ValueError:
                 pass
+        return PNCPConnector._backoff_delay(attempt)
+
+    @staticmethod
+    def _backoff_delay(attempt: int) -> float:
         return min(15 * (2**attempt), 300)
 
     @staticmethod

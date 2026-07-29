@@ -32,7 +32,7 @@ class FakeHttpClient:
 
 
 class SequenceHttpClient(FakeHttpClient):
-    def __init__(self, responses: list[HttpResponse]) -> None:
+    def __init__(self, responses: list[HttpResponse | TransportError]) -> None:
         self.responses = responses
         self.urls = []
         self.timeouts = []
@@ -40,7 +40,10 @@ class SequenceHttpClient(FakeHttpClient):
     async def get(self, url, *, headers=None, timeout=30):  # type: ignore[no-untyped-def]
         self.urls.append(url)
         self.timeouts.append(timeout)
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        if isinstance(response, TransportError):
+            raise response
+        return response
 
 
 class PNCPConnectorTests(unittest.TestCase):
@@ -273,6 +276,58 @@ class PNCPConnectorTests(unittest.TestCase):
         self.assertEqual(len(http.urls), 2)
         sleep.assert_awaited_once_with(15)
         self.assertIn("HTTP 500", logs.output[0])
+
+    def test_waits_and_recovers_from_transport_error(self) -> None:
+        timeout = TransportError("PNCP request timed out")
+        success = HttpResponse(
+            status=200,
+            headers={},
+            body=json.dumps(
+                {"data": [], "totalPaginas": 1, "numeroPagina": 1}
+            ).encode(),
+        )
+        http = SequenceHttpClient([timeout, success])
+
+        with (
+            patch(
+                "govdata_pncp.connector.monotonic",
+                side_effect=[0.0, 20.0, 20.0],
+            ),
+            patch(
+                "govdata_pncp.connector.asyncio.sleep",
+                new=AsyncMock(),
+            ) as sleep,
+            self.assertLogs("govdata_pncp.connector", level="WARNING") as logs,
+        ):
+            page = asyncio.run(
+                PNCPConnector().fetch_page(
+                    "open-opportunities",
+                    {"dataFinal": "20260723"},
+                    None,
+                    http,
+                )
+            )
+
+        self.assertEqual(page.records, ())
+        self.assertEqual(len(http.urls), 2)
+        sleep.assert_awaited_once_with(15)
+        self.assertIn("failed temporarily", logs.output[0])
+
+    def test_raises_transport_error_after_configured_retries(self) -> None:
+        timeout = TransportError("PNCP request timed out")
+        http = SequenceHttpClient([timeout])
+
+        with self.assertRaisesRegex(TransportError, "timed out"):
+            asyncio.run(
+                PNCPConnector({"rate_limit_retries": 0}).fetch_page(
+                    "open-opportunities",
+                    {"dataFinal": "20260723"},
+                    None,
+                    http,
+                )
+            )
+
+        self.assertEqual(len(http.urls), 1)
 
     def test_validates_request_rate(self) -> None:
         with self.assertRaises(ConnectorConfigurationError):
