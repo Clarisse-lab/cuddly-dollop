@@ -14,6 +14,7 @@ from govdata.core.entities import (
     EntityProfile,
     EntityRecordReferences,
     EntityReference,
+    EntitySummary,
 )
 from govdata.core.models import RecordPage, StoredRecord
 from govdata.infrastructure.migrations import load_migrations
@@ -370,6 +371,69 @@ class SQLiteRecordRepository:
                     datetime.fromisoformat(row[7]) if row[7] is not None else None
                 ),
                 source_url=row[8],
+            )
+            for row in rows
+        )
+
+    def search_entities(
+        self, entity_type: str, query: str, limit: int
+    ) -> tuple[EntitySummary, ...]:
+        term = query.strip().lower()
+        if not term or limit < 1:
+            return ()
+        identifier = "".join(character for character in term if character.isdigit())
+        identifier = identifier or term
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    entities.entity_id, entities.display_name,
+                    entities.first_seen_at, entities.last_seen_at,
+                    COUNT(entity_links.external_id) AS link_count
+                FROM entities
+                LEFT JOIN entity_links
+                  ON entity_links.entity_type = entities.entity_type
+                 AND entity_links.entity_id = entities.entity_id
+                WHERE entities.entity_type = ?
+                  AND (
+                    entities.entity_id LIKE ?
+                    OR LOWER(COALESCE(entities.display_name, '')) LIKE ?
+                  )
+                GROUP BY
+                    entities.entity_id, entities.display_name,
+                    entities.first_seen_at, entities.last_seen_at
+                ORDER BY
+                    CASE
+                        WHEN entities.entity_id = ? THEN 0
+                        WHEN entities.entity_id LIKE ? THEN 1
+                        WHEN LOWER(COALESCE(entities.display_name, '')) LIKE ? THEN 2
+                        ELSE 3
+                    END,
+                    link_count DESC,
+                    entities.display_name,
+                    entities.entity_id
+                LIMIT ?
+                """,
+                (
+                    entity_type,
+                    f"%{identifier}%",
+                    f"%{term}%",
+                    identifier,
+                    f"{identifier}%",
+                    f"{term}%",
+                    limit,
+                ),
+            ).fetchall()
+        return tuple(
+            EntitySummary(
+                entity=Entity(
+                    entity_type=entity_type,
+                    entity_id=row[0],
+                    display_name=row[1],
+                    first_seen_at=datetime.fromisoformat(row[2]),
+                    last_seen_at=datetime.fromisoformat(row[3]),
+                ),
+                link_count=row[4],
             )
             for row in rows
         )

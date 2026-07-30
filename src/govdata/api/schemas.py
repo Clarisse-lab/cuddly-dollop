@@ -76,3 +76,11 @@ class OrganizationOverviewResponse(BaseModel):
     counts: dict[str, int]
     totals: dict[str, float]
     activities: list[OrganizationActivityResponse]
+
+
+class OrganizationSearchResultResponse(BaseModel):
+    cnpj: str
+    name: str | None
+    link_count: int
+    first_seen_at: datetime
+    last_seen_at: datetime

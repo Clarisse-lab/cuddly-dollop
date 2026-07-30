@@ -45,6 +45,12 @@ class EntityProfile:
 
 
 @dataclass(frozen=True, slots=True)
+class EntitySummary:
+    entity: Entity
+    link_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class EntityLinkedRecord:
     connector_id: str
     dataset: str

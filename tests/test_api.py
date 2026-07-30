@@ -156,6 +156,39 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(body["totals"]["opportunities"], 150000)
         self.assertEqual(body["activities"][0]["category"], "opportunities")
 
+    def test_searches_organizations_by_name_and_formatted_cnpj(self) -> None:
+        self.repository.record_entity_links(
+            "pncp",
+            "contracts",
+            "contract-1",
+            (
+                EntityReference(
+                    "organization",
+                    "18393309000154",
+                    "Kali Propaganda e Publicidade Ltda",
+                    role="supplier",
+                ),
+            ),
+            datetime(2026, 7, 30, tzinfo=UTC),
+        )
+
+        by_name = self.client.get("/api/v1/organizations?q=propaganda")
+        by_cnpj = self.client.get("/api/v1/organizations?q=18.393.309/0001-54")
+
+        self.assertEqual(by_name.status_code, 200)
+        self.assertEqual(by_name.json()[0]["cnpj"], "18393309000154")
+        self.assertEqual(by_name.json()[0]["link_count"], 1)
+        self.assertEqual(by_cnpj.status_code, 200)
+        self.assertEqual(
+            by_cnpj.json()[0]["name"],
+            "Kali Propaganda e Publicidade Ltda",
+        )
+
+    def test_validates_organization_search(self) -> None:
+        response = self.client.get("/api/v1/organizations?q=a")
+
+        self.assertEqual(response.status_code, 422)
+
     def test_rejects_invalid_cnpj_overview(self) -> None:
         response = self.client.get("/api/v1/organizations/123/overview")
 

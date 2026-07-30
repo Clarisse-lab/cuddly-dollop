@@ -29,6 +29,7 @@ const elements = {
   organizationSearchForm: document.querySelector("#organization-search-form"),
   organizationCnpjInput: document.querySelector("#organization-cnpj-input"),
   organizationSearchButton: document.querySelector("#organization-search-button"),
+  organizationSearchResults: document.querySelector("#organization-search-results"),
   organizationEmpty: document.querySelector("#organization-empty"),
   organizationResult: document.querySelector("#organization-result"),
   organizationName: document.querySelector("#organization-name"),
@@ -280,31 +281,70 @@ function defaultOrganizationCategory(overview) {
 }
 async function searchOrganization(event) {
   event.preventDefault();
-  const cnpj = elements.organizationCnpjInput.value.replace(/\D/g, "");
-  if (cnpj.length !== 14) {
-    showToast("Digite um CNPJ com 14 números.");
+  const term = elements.organizationCnpjInput.value.trim();
+  const cnpj = term.replace(/\D/g, "");
+  if (term.length < 2) {
+    showToast("Digite ao menos 2 caracteres para buscar.");
     elements.organizationCnpjInput.focus();
     return;
   }
   elements.organizationSearchButton.disabled = true;
   elements.organizationSearchButton.textContent = "Buscando...";
   try {
-    state.organizationOverview = await fetchJson(`/api/v1/organizations/${cnpj}/overview`);
-    state.organizationCategory = defaultOrganizationCategory(state.organizationOverview);
-    renderOrganization();
-    elements.organizationResult.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (cnpj.length === 14 && /^[\d./-]+$/.test(term)) {
+      await loadOrganization(cnpj);
+      return;
+    }
+    const matches = await fetchJson(`/api/v1/organizations?q=${encodeURIComponent(term)}&limit=8`);
+    renderOrganizationSearchResults(matches);
+    if (!matches.length) showToast("Nenhuma organização encontrada.");
   } catch (error) {
-    state.organizationOverview = null;
-    elements.organizationResult.hidden = true;
-    elements.organizationEmpty.hidden = false;
-    elements.organizationEmpty.innerHTML = error.status === 404
-      ? '<span class="organization-empty-icon" aria-hidden="true">∅</span><div><h3>CNPJ ainda não encontrado</h3><p>Não há vínculos catalogados para esta organização nas bases já cruzadas.</p></div>'
-      : '<span class="organization-empty-icon" aria-hidden="true">!</span><div><h3>Não foi possível consultar</h3><p>Verifique a conexão com a API e tente novamente.</p></div>';
-    showToast(error.status === 404 ? "CNPJ não encontrado nas bases cruzadas." : error.message);
+    showOrganizationError(error);
   } finally {
     elements.organizationSearchButton.disabled = false;
     elements.organizationSearchButton.textContent = "Investigar";
   }
+}
+function renderOrganizationSearchResults(matches) {
+  if (!matches.length) {
+    elements.organizationSearchResults.hidden = true;
+    elements.organizationSearchResults.innerHTML = "";
+    return;
+  }
+  elements.organizationSearchResults.innerHTML = matches.map((match) => `
+    <button class="organization-search-option" type="button" data-cnpj="${escapeHtml(match.cnpj)}">
+      <span><strong>${escapeHtml(match.name || "Organização sem nome informado")}</strong><span>${escapeHtml(formatCnpj(match.cnpj))}</span></span>
+      <small>${numberFormat.format(match.link_count)} ${match.link_count === 1 ? "vínculo" : "vínculos"}</small>
+    </button>
+  `).join("");
+  elements.organizationSearchResults.hidden = false;
+}
+async function loadOrganization(cnpj) {
+  elements.organizationSearchResults.hidden = true;
+  elements.organizationSearchResults.innerHTML = "";
+  elements.organizationSearchButton.disabled = true;
+  elements.organizationSearchButton.textContent = "Buscando...";
+  try {
+    state.organizationOverview = await fetchJson(`/api/v1/organizations/${cnpj}/overview`);
+    state.organizationCategory = defaultOrganizationCategory(state.organizationOverview);
+    elements.organizationCnpjInput.value = formatCnpj(cnpj);
+    renderOrganization();
+    elements.organizationResult.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    showOrganizationError(error);
+  } finally {
+    elements.organizationSearchButton.disabled = false;
+    elements.organizationSearchButton.textContent = "Investigar";
+  }
+}
+function showOrganizationError(error) {
+  state.organizationOverview = null;
+  elements.organizationResult.hidden = true;
+  elements.organizationEmpty.hidden = false;
+  elements.organizationEmpty.innerHTML = error.status === 404
+    ? '<span class="organization-empty-icon" aria-hidden="true">∅</span><div><h3>CNPJ ainda não encontrado</h3><p>Não há vínculos catalogados para esta organização nas bases já cruzadas.</p></div>'
+    : '<span class="organization-empty-icon" aria-hidden="true">!</span><div><h3>Não foi possível consultar</h3><p>Verifique a conexão com a API e tente novamente.</p></div>';
+  showToast(error.status === 404 ? "CNPJ não encontrado nas bases cruzadas." : error.message);
 }
 async function loadDashboard() {
   elements.refreshButton.classList.add("loading");
@@ -358,6 +398,11 @@ elements.searchInput.addEventListener("input", renderOpportunities);
 elements.stateFilter.addEventListener("change", renderOpportunities);
 elements.sortFilter.addEventListener("change", renderOpportunities);
 elements.organizationSearchForm.addEventListener("submit", searchOrganization);
+elements.organizationSearchResults.addEventListener("click", (event) => {
+  const option = event.target.closest("button[data-cnpj]");
+  if (!option) return;
+  loadOrganization(option.dataset.cnpj);
+});
 elements.organizationTabs.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-category]");
   if (!button) return;

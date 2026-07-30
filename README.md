@@ -386,10 +386,16 @@ Consulte o resultado pela API:
 
 ```text
 GET /api/v1/entities/organization/{cnpj}
+GET /api/v1/organizations/{cnpj}/overview
+GET /api/v1/organizations?q={nome-ou-cnpj}&limit=10
 ```
 
 Retorna o nome conhecido da entidade e todos os registros de todas as fontes já
 vinculados a ela (conector, dataset, id externo e o papel — `buyer`, `beneficiary` etc.).
+O endpoint de busca aceita parte do nome ou um CNPJ com ou sem formatação e retorna
+até 20 organizações ordenadas por correspondência e quantidade de vínculos. O
+dashboard usa esse endpoint para permitir descoberta sem exigir que o usuário já
+conheça o CNPJ.
 
 Em produção, `railway.entity-resolution-worker.toml` roda `govdata link` diariamente
 às 13:00 UTC, depois dos workers de sincronização. Ele quebra de propósito o padrão

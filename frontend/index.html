@@ -80,21 +80,22 @@
             <div>
               <p class="panel-kicker">CRUZAMENTO DE DADOS</p>
               <h2 id="organizations-title">Radar de organizações</h2>
-              <p>Consulte um CNPJ e veja os vínculos encontrados entre as bases públicas.</p>
+              <p>Busque por nome ou CNPJ e veja os vínculos encontrados entre as bases públicas.</p>
             </div>
             <form class="organization-search" id="organization-search-form">
-              <label for="organization-cnpj-input">CNPJ</label>
+              <label for="organization-cnpj-input">Nome ou CNPJ</label>
               <div class="organization-search-row">
-                <input id="organization-cnpj-input" type="search" inputmode="numeric" placeholder="11.413.810/0001-96" autocomplete="off" />
+                <input id="organization-cnpj-input" type="search" placeholder="Ex.: Fundo Municipal de Saúde" autocomplete="off" />
                 <button id="organization-search-button" type="submit">Investigar</button>
               </div>
+              <div class="organization-search-results" id="organization-search-results" hidden></div>
             </form>
           </div>
 
           <div class="panel organization-empty" id="organization-empty">
             <span class="organization-empty-icon" aria-hidden="true">⌕</span>
             <div>
-              <h3>Comece por um CNPJ</h3>
+              <h3>Encontre uma organização</h3>
               <p>O Radar reúne emendas, pagamentos e licitações ligados à mesma organização, preservando a fonte de cada informação.</p>
             </div>
           </div>

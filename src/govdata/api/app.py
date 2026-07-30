@@ -15,6 +15,7 @@ from govdata.api.schemas import (
     HealthResponse,
     OrganizationActivityResponse,
     OrganizationOverviewResponse,
+    OrganizationSearchResultResponse,
     RecordPageResponse,
     RecordResponse,
 )
@@ -163,6 +164,31 @@ def create_app(
                 for link in profile.links
             ],
         )
+
+    @application.get(
+        "/api/v1/organizations",
+        response_model=list[OrganizationSearchResultResponse],
+        tags=["intelligence"],
+    )
+    def search_organizations(
+        q: str = Query(min_length=2, max_length=120),
+        limit: int = Query(default=10, ge=1, le=20),
+    ) -> list[OrganizationSearchResultResponse]:
+        term = q.strip()
+        if len(term) < 2:
+            raise HTTPException(
+                status_code=422, detail="search must contain at least 2 characters"
+            )
+        return [
+            OrganizationSearchResultResponse(
+                cnpj=item.entity.entity_id,
+                name=item.entity.display_name,
+                link_count=item.link_count,
+                first_seen_at=item.entity.first_seen_at,
+                last_seen_at=item.entity.last_seen_at,
+            )
+            for item in repository.search_entities("organization", term, limit)
+        ]
 
     @application.get(
         "/api/v1/organizations/{cnpj}/overview",

@@ -10,6 +10,7 @@ from govdata.core.entities import (
     EntityProfile,
     EntityRecordReferences,
     EntityReference,
+    EntitySummary,
 )
 from govdata.core.models import ConnectorPage, ConnectorSpec, RecordPage, StoredRecord
 
@@ -117,6 +118,10 @@ class EntityRepository(Protocol):
     def get_entity_records(
         self, entity_type: str, entity_id: str
     ) -> tuple[EntityLinkedRecord, ...]: ...
+
+    def search_entities(
+        self, entity_type: str, query: str, limit: int
+    ) -> tuple[EntitySummary, ...]: ...
 
 
 class DataRepository(RecordRepository, RecordQueryRepository, EntityRepository, Protocol):
