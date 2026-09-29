@@ -41,7 +41,7 @@ class PostgresRecordRepository:
             with self._psycopg.connect(self._database_url) as connection:
                 yield connection
         except self._psycopg.Error as error:
-            raise PersistenceError("PostgreSQL operation failed") from error
+            raise PersistenceError(f"PostgreSQL operation failed: {error}") from error
 
     def _initialize(self) -> None:
         with self._connect() as connection:
